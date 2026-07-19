@@ -1,5 +1,5 @@
 /// 갓생 내기 — 돈 정산 로직 프로토타입 (PROTO_SPEC.md)
-/// ver1: 균등 베팅 + flat 몰수 + 성공자 균등 분배
+/// ver2: 가변 베팅 + flat 몰수 + 성공자 지분 가중 분배
 ///
 /// 프로토 스코프: Clock/시간검증 없음. 오라클(= 방 생성자)이 submit_results를
 /// 수동 호출할 때마다 day가 +1 되는 수동 day 카운터 방식.
@@ -11,7 +11,7 @@ use sui::sui::SUI;
 use sui::table::{Self, Table};
 
 // === 에러 코드 ===
-const EWrongStakeAmount: u64 = 0;
+const EZeroStake: u64 = 0;
 const EAlreadyJoined: u64 = 1;
 const EJoinClosed: u64 = 2;
 const ENotOracle: u64 = 3;
@@ -34,8 +34,6 @@ public struct Challenge has key {
     id: UID,
     /// 결과 제출 권한자. 프로토에선 방 생성자 = 오라클 (수동 호출)
     oracle: address,
-    /// ver1: 균등 베팅 — 방 생성 시 고정된 1인당 예치액 (MIST)
-    stake_amount: u64,
     total_days: u64,
     /// 0 = 시작 전. submit_results마다 +1
     current_day: u64,
@@ -61,11 +59,10 @@ public struct Participant has store {
 }
 
 /// 챌린지 방 생성. 호출자가 오라클이 된다.
-public fun create_challenge(stake_amount: u64, total_days: u64, ctx: &mut TxContext) {
+public fun create_challenge(total_days: u64, ctx: &mut TxContext) {
     let ch = Challenge {
         id: object::new(ctx),
         oracle: ctx.sender(),
-        stake_amount,
         total_days,
         current_day: 0,
         vault: balance::zero(),
@@ -83,11 +80,13 @@ public fun join(ch: &mut Challenge, stake: Coin<SUI>, ctx: &TxContext) {
     assert!(ch.current_day == 0, EJoinClosed); // 시작 후 참여는 ver4에서
     let sender = ctx.sender();
     assert!(!ch.participants.contains(sender), EAlreadyJoined);
-    assert!(stake.value() == ch.stake_amount, EWrongStakeAmount);
+    // ver2: 가변 베팅 — 금액은 자유, 단 0원(지분 0 무임승차)은 거부
+    let amount = stake.value();
+    assert!(amount > 0, EZeroStake);
 
     ch.vault.join(stake.into_balance());
     ch.participants.add(sender, Participant {
-        stake: ch.stake_amount,
+        stake: amount,
         start_day: 1,
         failed_day: 0,
         claimable: 0,
@@ -120,33 +119,39 @@ public fun finalize(ch: &mut Challenge) {
     assert!(ch.current_day == ch.total_days, EChallengeNotOver);
     ch.status = STATUS_ENDED;
 
-    // 1차 순회: 몰수 총액 + 성공자 수 집계 (Table 순회 불가 → vector로)
+    // 1차 순회: 몰수 총액 + 성공자 지분 총합 집계 (Table 순회 불가 → vector로)
     let list = ch.participant_list;
     let mut forfeit_total = 0;
-    let mut survivor_count = 0;
+    let mut survivor_stake_sum = 0;
     list.do_ref!(|addr| {
         let p = ch.participants.borrow(*addr);
         if (p.failed_day == 0) {
-            survivor_count = survivor_count + 1;
+            survivor_stake_sum = survivor_stake_sum + p.stake;
         } else {
             forfeit_total = forfeit_total + p.stake;
         };
     });
 
     // 2차 순회: claimable 기록
-    if (survivor_count == 0) {
-        // 엣지: 전원 탈락 → 성공자 0으로 나누기 불가. 챌린지 불성립, 각자 원금 원위치
+    if (survivor_stake_sum == 0) {
+        // 엣지: 전원 탈락(stake>0이므로 지분합 0 = 성공자 0명) → 0으로 나누기 불가.
+        // 챌린지 불성립, 각자 원금 원위치
         list.do_ref!(|addr| {
             let p = ch.participants.borrow_mut(*addr);
             p.claimable = p.stake;
         });
     } else {
-        // ver1 수식: 성공자 수령액 = stake + 몰수총액/성공자수 (floor, 나머지는 dust로 vault 잔류)
-        // 전원 성공이면 forfeit_total = 0 → share = 0, 원금만 반환 (abort 없음)
-        let share = forfeit_total / survivor_count;
+        // ver2 수식: 성공자 i 수령액 = stake_i + 몰수총액 × stake_i / 성공자지분합
+        // 곱셈 먼저·나눗셈 마지막 1회 (절단 오차 최소화), floor 나머지는 dust로 vault 잔류.
+        // 몰수총액×stake는 u64 상한(~1.8e19)을 쉽게 넘음 → u128 캐스팅 필수
+        // 전원 성공이면 forfeit_total = 0 → 분배 0, 원금만 반환 (abort 없음)
         list.do_ref!(|addr| {
             let p = ch.participants.borrow_mut(*addr);
             if (p.failed_day == 0) {
+                let share = (
+                    (forfeit_total as u128) * (p.stake as u128)
+                        / (survivor_stake_sum as u128)
+                ) as u64;
                 p.claimable = p.stake + share;
             };
         });
