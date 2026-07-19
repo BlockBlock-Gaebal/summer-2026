@@ -1,5 +1,5 @@
 /// 갓생 내기 — 돈 정산 로직 프로토타입 (PROTO_SPEC.md)
-/// ver3: 가변 베팅 + 볼록결합 환급 커브 + 스트리밍(베스팅) 일일정산
+/// ver4: 가변 베팅 + 볼록결합 환급 커브 + 스트리밍 일일정산 + 중도 참여(acc_per_share)
 ///
 /// 프로토 스코프: Clock/시간검증 없음. 오라클(= 방 생성자)이 submit_results를
 /// 수동 호출할 때마다 day가 +1 되는 수동 day 카운터 방식.
@@ -28,6 +28,10 @@ const EInvalidAlpha: u64 = 11;
 const STATUS_ACTIVE: u8 = 0;
 const STATUS_ENDED: u8 = 1;
 
+/// [ver4] acc_per_share 배율. "stake 1 MIST가 받았어야 할 배당"은 1 MIST보다
+/// 훨씬 작은 소수라, 1e12를 곱해 u128 정수로 들고 다니다 정산 때 1회 나눠 내린다
+const SCALE: u128 = 1_000_000_000_000;
+
 /// 챌린지 방 하나 = shared object 하나.
 /// 누구나 트랜잭션에서 참조할 수 있어야 하므로 (여러 유저가 join)
 /// owned object가 아니라 shared object로 만든다.
@@ -44,6 +48,12 @@ public struct Challenge has key {
     /// [ver3] 전역 일일 방출량 (MIST). 몰수 발생 시에만 증가 (단조증가).
     /// 모든 스트림의 종점이 total_days로 같아서 변수 하나로 O(1) 관리 가능
     daily_drip: u64,
+    /// [ver4] "챌린지 시작부터 지금까지 stake 1 MIST가 받았어야 할 배당 누적치"
+    /// (×SCALE). 매일 acc += drip×SCALE/생존자지분합.
+    /// 개인 배당 = stake × (acc_정산시점 − acc_참여시점) / SCALE — 참여 시점의
+    /// acc를 스냅샷해 빼므로 진입 이전 배당 제외가 수학적으로 자동 보장
+    /// (Aave/MasterChef 정석 패턴)
+    acc_per_share: u128,
     /// 예치금 전부 보관. Coin이 아니라 Balance인 이유:
     /// Coin은 UID를 가진 "지갑 속 낱개 객체", Balance는 다른 객체 안에
     /// 품어두는 잔액 타입 — vault처럼 내부 보관엔 Balance가 정석
@@ -57,8 +67,10 @@ public struct Challenge has key {
 public struct Participant has store {
     /// 예치액 (MIST)
     stake: u64,
-    /// ver4(중도 참여)용. ver1에선 항상 1
+    /// [ver4] 참여 시작 day. 시작 전 참여 = 1, day d 진행 후 참여 = d+1
     start_day: u64,
+    /// [ver4] 참여 시점의 acc_per_share 스냅샷 — 이전 배당 제외의 기준점
+    acc_entry: u128,
     /// 0 = 생존 중, n = day n에 탈락
     failed_day: u64,
     /// 정산 누적액 — pull 패턴: 컨트랙트가 보내주지 않고 각자 claim으로 찾아감
@@ -89,6 +101,20 @@ public fun calc_forfeit(stake: u64, d: u64, total_days: u64, alpha_bp: u64): u64
     stake - calc_refund(stake, d, total_days, alpha_bp)
 }
 
+/// [ver4] 중도 참여자의 커브는 개인 타임라인 기준.
+/// ⚠️ 임시 규칙 (스펙 §5 튜닝 미결 — 중도참여자의 D 정의는 회의 확정 대기):
+///   d_개인 = failed_day − start_day + 1, D_개인 = total_days − start_day + 1
+/// start_day=1이면 ver3 커브와 정확히 일치 (자연스러운 일반화)
+fun personal_refund(stake: u64, start_day: u64, failed_day: u64, total_days: u64, alpha_bp: u64): u64 {
+    calc_refund(stake, failed_day - start_day + 1, total_days - start_day + 1, alpha_bp)
+}
+
+/// [ver4] 미정산 배당 = stake × (acc_지금 − acc_참여시점) / SCALE.
+/// 곱셈 먼저 u128, 나눗셈(SCALE 내리기)은 마지막 1회
+fun pending_dividend(stake: u64, acc_entry: u128, acc_now: u128): u64 {
+    ((stake as u128) * (acc_now - acc_entry) / SCALE) as u64
+}
+
 /// 챌린지 방 생성. 호출자가 오라클이 된다.
 public fun create_challenge(total_days: u64, alpha_bp: u64, ctx: &mut TxContext) {
     assert!(alpha_bp <= 10000, EInvalidAlpha);
@@ -99,6 +125,7 @@ public fun create_challenge(total_days: u64, alpha_bp: u64, ctx: &mut TxContext)
         total_days,
         current_day: 0,
         daily_drip: 0,
+        acc_per_share: 0,
         vault: balance::zero(),
         participants: table::new(ctx),
         participant_list: vector[],
@@ -111,7 +138,9 @@ public fun create_challenge(total_days: u64, alpha_bp: u64, ctx: &mut TxContext)
 /// Move에서 돈은 리소스라 인자로 받은 순간 이 함수가 소유권을 넘겨받고,
 /// 어딘가에 반드시 넣어야(join) 컴파일이 된다 (증발 불가).
 public fun join(ch: &mut Challenge, stake: Coin<SUI>, ctx: &TxContext) {
-    assert!(ch.current_day == 0, EJoinClosed); // 시작 후 참여는 ver4에서
+    // [ver4] 중도 참여 허용 — 진행 중이고 남은 날이 있으면 언제든.
+    // ⚠️ 참여 마감선은 미결 안건 (스펙 §5 튜닝 미결) — 확정 시 파라미터화
+    assert!(ch.status == STATUS_ACTIVE && ch.current_day < ch.total_days, EJoinClosed);
     let sender = ctx.sender();
     assert!(!ch.participants.contains(sender), EAlreadyJoined);
     // ver2: 가변 베팅 — 금액은 자유, 단 0원(지분 0 무임승차)은 거부
@@ -121,7 +150,10 @@ public fun join(ch: &mut Challenge, stake: Coin<SUI>, ctx: &TxContext) {
     ch.vault.join(stake.into_balance());
     ch.participants.add(sender, Participant {
         stake: amount,
-        start_day: 1,
+        // day d까지 진행된 방에 들어오면 day d+1부터가 내 챌린지
+        start_day: ch.current_day + 1,
+        // 지금까지의 acc를 스냅샷 → 이전 배당은 (acc − acc_entry) 뺄셈에서 자동 제외
+        acc_entry: ch.acc_per_share,
         failed_day: 0,
         claimable: 0,
     });
@@ -138,17 +170,21 @@ public fun submit_results(ch: &mut Challenge, failed: vector<address>, ctx: &TxC
     ch.current_day = ch.current_day + 1;
     let d = ch.current_day;
 
-    // ① 오늘 탈락 기록 + 몰수분 스트림 편입.
-    //    분배(③)보다 먼저 해야 "그날 탈락자는 그날 배당 제외" 규칙이 성립
+    // ① 오늘 탈락 기록 + 배당 정산 + 몰수분 스트림 편입.
+    //    acc 갱신(③)보다 먼저, "갱신 전 acc"로 정산해야
+    //    "그날 탈락자는 그날 배당 제외" 규칙이 성립
+    let acc_before = ch.acc_per_share;
     failed.do!(|addr| {
         assert!(ch.participants.contains(addr), ENotParticipant);
         let p = ch.participants.borrow_mut(addr);
         assert!(p.failed_day == 0, EAlreadyFailed); // 재제출 = 정산 오염 차단
         p.failed_day = d;
+        // 생존 기간에 쌓인 배당을 지금 확정 (이후 acc가 올라도 못 받음)
+        p.claimable = p.claimable + pending_dividend(p.stake, p.acc_entry, acc_before);
         // 몰수액을 day d ~ D의 (D−d+1)일에 걸쳐 균등 방출.
         // 스트림 편입 시점에 1회 절단 (스펙 §1-3 규약 — 테스트 기대값의 전제)
-        let forfeit = calc_forfeit(p.stake, d, ch.total_days, ch.alpha_bp);
-        ch.daily_drip = ch.daily_drip + forfeit / (ch.total_days - d + 1);
+        let refund = personal_refund(p.stake, p.start_day, d, ch.total_days, ch.alpha_bp);
+        ch.daily_drip = ch.daily_drip + (p.stake - refund) / (ch.total_days - d + 1);
     });
 
     // ② 오늘 기준 생존자 지분합 (Table 순회 불가 → vector로 그날그날 계산)
@@ -164,25 +200,18 @@ public fun submit_results(ch: &mut Challenge, failed: vector<address>, ctx: &TxC
     if (survivor_stake_sum == 0) {
         // ⚠️ 전멸 임시 규칙 (스펙 §4, 회의 확정 대기): 최후 생존자들이 동시 탈락하면
         // 잔여 스트림의 수령자가 없음 → 조기 ENDED + 탈락자 커브 환급만 확정.
-        // 미방출 스트림 잔액은 vault 잔류 (dust 취급, 보존 테스트에서 별도 항)
+        // (배당은 ①에서 이미 정산됨) 미방출 스트림 잔액은 vault 잔류 (dust 취급)
         ch.status = STATUS_ENDED;
         list.do_ref!(|addr| {
             let p = ch.participants.borrow_mut(*addr);
-            p.claimable =
-                p.claimable + calc_refund(p.stake, p.failed_day, ch.total_days, ch.alpha_bp);
+            p.claimable = p.claimable
+                + personal_refund(p.stake, p.start_day, p.failed_day, ch.total_days, ch.alpha_bp);
         });
     } else {
-        // ③ 오늘의 방출량을 생존자에게 지분 비례 적립 (곱셈 먼저·u128, floor 잔여는 dust)
-        let drip = ch.daily_drip;
-        list.do_ref!(|addr| {
-            let p = ch.participants.borrow_mut(*addr);
-            if (p.failed_day == 0) {
-                let share = (
-                    (drip as u128) * (p.stake as u128) / (survivor_stake_sum as u128)
-                ) as u64;
-                p.claimable = p.claimable + share;
-            };
-        });
+        // ③ 오늘의 방출량을 "지분당 누적 배당"에 반영 — 개인별 순회 적립 대신 O(1).
+        // 개인 몫은 탈락/종료 시점에 (acc − acc_entry)로 일괄 정산 (절단도 그때 1회)
+        ch.acc_per_share =
+            ch.acc_per_share + (ch.daily_drip as u128) * SCALE / (survivor_stake_sum as u128);
     };
 }
 
@@ -194,18 +223,18 @@ public fun finalize(ch: &mut Challenge) {
     assert!(ch.current_day == ch.total_days, EChallengeNotOver);
     ch.status = STATUS_ENDED;
 
-    // 배당은 submit_results에서 매일 적립돼 있음 (스트리밍).
-    // 여기선 성공자 원금 + 탈락자 커브 환급만 claimable에 합산.
     // 전원 탈락(전멸)은 submit_results가 조기 ENDED로 처리 — 여기 도달 시 생존자 ≥ 1
     let list = ch.participant_list;
+    let acc = ch.acc_per_share;
     list.do_ref!(|addr| {
         let p = ch.participants.borrow_mut(*addr);
         if (p.failed_day == 0) {
-            p.claimable = p.claimable + p.stake; // 성공자: 원금 반환
+            // 성공자: 누적 배당 정산 + 원금 반환
+            p.claimable = p.claimable + pending_dividend(p.stake, p.acc_entry, acc) + p.stake;
         } else {
-            // 탈락자: 커브 환급 (진행 중 현금화 차단 — claim 자체가 ENDED에서만 가능)
-            p.claimable =
-                p.claimable + calc_refund(p.stake, p.failed_day, ch.total_days, ch.alpha_bp);
+            // 탈락자: 커브 환급 (배당은 탈락 당일 이미 정산. claim 자체가 ENDED에서만 가능)
+            p.claimable = p.claimable
+                + personal_refund(p.stake, p.start_day, p.failed_day, ch.total_days, ch.alpha_bp);
         };
     });
 }
