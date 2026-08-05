@@ -192,8 +192,8 @@ fun test_submit_beyond_total_days_fails() {
 #[test]
 fun test_t2_curve_unit() {
     let stake = 10 * ONE_SUI;
-    // | d      | 1    | 2    | 3    | 4    | 5     |
-    // | 환급   | 0.88 | 2.32 | 4.32 | 6.88 | 10.00 |
+    // | d      | 1    | 2    | 3    | 4    | 5    |
+    // | 환급   | 0.00 | 0.72 | 2.08 | 4.08 | 6.72 |
     // day1 탈락 = k0 = 하루도 성공 못 함 → 환급 0
     assert!(challenge::calc_refund(stake, 1, 5, 2000) ==             0);
     assert!(challenge::calc_refund(stake, 2, 5, 2000) ==   720_000_000);
@@ -214,10 +214,10 @@ fun test_t2_curve_unit() {
 // ============================================================
 // ver3 — T1: 스트리밍 로직 검증, dust 0 케이스 (α=1.0)
 // 스펙 §4: D=5, A/B/C 각 10 SUI. B day2 탈락, C day4 탈락
-//   day2: B 몰수 6 → drip += 6/4 = 1.5, A/C 각 +0.75
-//   day3: drip 1.5 → A/C 각 +0.75
-//   day4: C 몰수 2 → drip += 2/2 = 1.0 (drip=2.5), A만 +2.5
-//   day5: drip 2.5 → A +2.5
+//   day2: B 몰수 8 → drip += 8/4 = 2.0, A/C 각 +1.0
+//   day3: drip 2.0 → A/C 각 +1.0
+//   day4: C 몰수 4 → drip += 4/2 = 2.0 (drip=4.0), A만 +4.0
+//   day5: drip 4.0 → A +4.0
 // [D-05 적용] 기대: A = 20 / C = 8 / B = 2 SUI, dust = 0
 // ============================================================
 
@@ -256,7 +256,7 @@ fun test_t1_streaming_settlement() {
 
 // ============================================================
 // ver3 — T3: dust 검증 (α=1.0, B day3만 탈락)
-// 스펙 §4: B 몰수 4e9 → drip = 4e9/3 = 1,333,333,333 (절단)
+// 스펙 §4: B 몰수 6e9 → drip = 6e9/3 = 2e9 (여기선 정확히 떨어짐. 절단은 지분 분배에서 발생)
 //   [D-05 부수성질] α=1에서 drip 증가분이 항상 s/D로 일정 → 3인 균등 시 전부 정확히
 //   나누어떨어져 dust가 0이 된다. dust 검증 기능을 되살리려면 생존자 수가 3 이상이어야 함
 //   → 4인(A/B/C/E)으로 교체. B day3 탈락(k=2, 환급 4, 몰수 6) → drip 2, 생존 3인 지분합 30
@@ -302,9 +302,9 @@ fun test_t3_dust_bound() {
 // ============================================================
 
 // V4-1: A, B 시작 참여(각 10) / B day2 탈락 / C day3부터 참여(10)
-//   day2: B 몰수 6 → drip 1.5, 생존자 A 혼자 → A +1.5
-//   day3~5: A, C 반반 → 각 +0.75/일
-// 기대: A = 13.75 / C = 12.25 (day2 몫 제외!) / B = 4.0, dust 0
+//   day2: B 몰수 8 → drip 2.0, 생존자 A 혼자 → A +2.0
+//   day3~5: A, C 반반 → 각 +1.0/일
+// 기대: A = 15.0 / C = 13.0 (day2 몫 제외!) / B = 2.0, dust 0
 #[test]
 fun test_v4_midjoin_excluded_from_prior_dividends() {
     let mut scenario = ts::begin(ORACLE);
@@ -320,22 +320,22 @@ fun test_v4_midjoin_excluded_from_prior_dividends() {
     submit_as(&mut scenario, ORACLE, vector[]);  // day5
     finalize_as(&mut scenario, ORACLE);
 
-    assert!(claim_as(&mut scenario, A) == 15_000_000_000); // 10 + 1.5 + 0.75×3
-    assert!(claim_as(&mut scenario, C) == 13_000_000_000); // 10 + 0.75×3 (day2 몫 없음)
+    assert!(claim_as(&mut scenario, A) == 15_000_000_000); // 10 + 2.0 + 1.0×3
+    assert!(claim_as(&mut scenario, C) == 13_000_000_000); // 10 + 1.0×3 (day2 몫 없음)
     assert!(claim_as(&mut scenario, B) ==  2_000_000_000);
 
     scenario.next_tx(ORACLE);
     let ch = scenario.take_shared<Challenge>();
-    assert!(challenge::vault_value(&ch) == 0); // 보존: 13.75+12.25+4 = 30, dust 0
+    assert!(challenge::vault_value(&ch) == 0); // 보존: 15+13+2 = 30, dust 0
     ts::return_shared(ch);
     scenario.end();
 }
 
 // V4-2: V4-1에서 C가 day4 탈락 — 중도 참여자의 커브는 "개인 타임라인" 기준
-//   ⚠️ 임시 규칙 (스펙 §5 튜닝 미결): d_개인 = 탈락일−start_day+1, D_개인 = D−start_day+1
-//   C: start_day=3, day4 탈락 → d=2, D=3 → 환급 = 10×2/3 = 6,666,666,666
-//   C 몰수 3,333,333,334 → drip += /2 = 1,666,666,667 → day4~5 A 독식
-// 기대: A = 18,583,333,334 / C = 7,416,666,666 / B = 4.0 (합 정확히 30, dust 0)
+//   ⚠️ 임시 규칙 T-02 / T-03 후속 과제 (DECISIONS.md §2): d_개인 = 탈락일−start_day+1, D_개인 = D−start_day+1
+//   C: start_day=3, day4 탈락 → d=2, D=3 → [D-05] k=1 → 환급 = 10×1/3 = 3,333,333,333
+//   C 몰수 6,666,666,667 → drip += /2 = 3,333,333,333 → day4~5 A 독식
+// 기대: A = 23,666,666,666 / C = 4,333,333,333 / B = 2.0 (합 29,999,999,999 + dust 1 = 30)
 #[test]
 fun test_v4_midjoin_personal_timeline_curve() {
     let mut scenario = ts::begin(ORACLE);
@@ -346,13 +346,13 @@ fun test_v4_midjoin_personal_timeline_curve() {
     submit_as(&mut scenario, ORACLE, vector[]);  // day1
     submit_as(&mut scenario, ORACLE, vector[B]); // day2: B 탈락
     join_as(&mut scenario, C, 10 * ONE_SUI);     // C 중도 참여 (start_day=3)
-    submit_as(&mut scenario, ORACLE, vector[]);  // day3: A, C 각 +0.75
+    submit_as(&mut scenario, ORACLE, vector[]);  // day3: A, C 각 +1.0
     submit_as(&mut scenario, ORACLE, vector[C]); // day4: C 개인 타임라인 2/3 지점 탈락
     submit_as(&mut scenario, ORACLE, vector[]);  // day5
     finalize_as(&mut scenario, ORACLE);
 
     assert!(claim_as(&mut scenario, A) == 23_666_666_666);
-    assert!(claim_as(&mut scenario, C) ==  4_333_333_333); // 환급 6,666,666,666 + 배당 0.75
+    assert!(claim_as(&mut scenario, C) ==  4_333_333_333); // 환급 3,333,333,333 + 배당 1.0
     assert!(claim_as(&mut scenario, B) ==  2_000_000_000);
 
     scenario.next_tx(ORACLE);
@@ -377,7 +377,7 @@ fun test_join_after_last_day_fails() {
 // 엣지케이스 + 가드
 // ============================================================
 
-// ⚠️ 전멸 (최후 생존자 동시 탈락) — 임시 규칙 (스펙 §4, 회의 확정 대기):
+// ⚠️ 전멸 (최후 생존자 동시 탈락) — 임시 규칙 (스펙 §4, T-02 / T-03 후속 과제 — DECISIONS.md §2):
 // 생존자 0 감지 시 조기 ENDED, 탈락자 환급은 확정, 미방출 스트림은 vault 잔류(dust 취급)
 #[test]
 fun test_annihilation_early_end() {

@@ -42,8 +42,8 @@ public struct Challenge has key {
     id: UID,
     /// 결과 제출 권한자. 프로토에선 방 생성자 = 오라클 (수동 호출)
     oracle: address,
-    /// 환급 커브 파라미터 α (basis point, 0~10000).
-    /// ⚠️ PLACEHOLDER: 회의 후 확정 (권장 탐색 [2000, 4000], 임시 10000=순수 선형)
+    /// 환급 커브 파라미터 α (basis point, 0~10000). 확정값 2000 = α 0.2 (D-06).
+    /// 방 생성 시 파라미터로 받으므로 방마다 다른 값을 쓸 수 있다.
     alpha_bp: u64,
     total_days: u64,
     /// 0 = 시작 전. submit_results마다 +1
@@ -245,7 +245,7 @@ public fun submit_results(ch: &mut Challenge, failed: vector<address>, ctx: &TxC
     });
 
     if (survivor_stake_sum == 0) {
-        // ⚠️ 전멸 임시 규칙 (스펙 §4, 회의 확정 대기): 최후 생존자들이 동시 탈락하면
+        // ⚠️ 전멸 임시 규칙 (스펙 §4, T-02 / T-03 후속 과제 — DECISIONS.md §2): 최후 생존자들이 동시 탈락하면
         // 잔여 스트림의 수령자가 없음 → 조기 ENDED + 탈락자 커브 환급만 확정.
         // (배당은 ①에서 이미 정산됨) 미방출 스트림 잔액은 vault 잔류 (dust 취급)
         ch.status = STATUS_ENDED;
