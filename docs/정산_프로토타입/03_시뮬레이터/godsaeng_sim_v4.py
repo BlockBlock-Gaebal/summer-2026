@@ -28,16 +28,20 @@ from matplotlib import font_manager
 import os
 import platform
 
+# ⚠️ style.use()는 rcParams를 통째로 리셋하므로 반드시 폰트 설정보다 먼저 호출할 것
+plt.style.use("seaborn-v0_8-whitegrid")
+
 if platform.system() == "Windows":
     plt.rcParams["font.family"] = "Malgun Gothic"
 elif platform.system() == "Darwin":
     plt.rcParams["font.family"] = "AppleGothic"
 else:
-    _KR = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
-    if os.path.exists(_KR):
-        font_manager.fontManager.addfont(_KR)
-        plt.rcParams["font.family"] = font_manager.FontProperties(fname=_KR).get_name()
-plt.style.use("seaborn-v0_8-whitegrid")
+    for _KR in ("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+                "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"):
+        if os.path.exists(_KR):
+            font_manager.fontManager.addfont(_KR)
+            plt.rcParams["font.family"] = font_manager.FontProperties(fname=_KR).get_name()
+            break
 plt.rcParams["axes.unicode_minus"] = False
 plt.rcParams.update({"figure.dpi": 150, "font.size": 11,
                      "axes.titlesize": 13, "axes.titleweight": "bold"})
@@ -50,7 +54,10 @@ os.makedirs(FIGDIR, exist_ok=True)
 
 # ================================================================ 커브
 def retention(d, Dj, alpha):
-    x = d / Dj
+    # [D-05] 커브 입력은 개인 경과일 d가 아니라 개인 완주일수 k = d − 1.
+    # day d에 탈락한 사람이 실제로 성공한 날은 (d−1)일이기 때문.
+    # 개인 정규화(명제 5)는 그대로 유지 — 분모 Dj는 개인 잔여기간
+    x = max(d - 1.0, 0.0) / Dj
     return alpha * x + (1 - alpha) * x * x
 
 

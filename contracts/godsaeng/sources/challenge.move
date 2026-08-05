@@ -23,10 +23,13 @@ const EAlreadyEnded: u64 = 8;
 const ENotEnded: u64 = 9;
 const ENothingToClaim: u64 = 10;
 const EInvalidAlpha: u64 = 11;
+const EWithdrawClosed: u64 = 12;
 
 // === 상태 ===
-const STATUS_ACTIVE: u8 = 0;
-const STATUS_ENDED: u8 = 1;
+/// [D-08] 첫 결과 제출 전. 돈이 아직 잠기지 않아 join/withdraw 자유
+const STATUS_PENDING: u8 = 0;
+const STATUS_ACTIVE: u8 = 1;
+const STATUS_ENDED: u8 = 2;
 
 /// [ver4] acc_per_share 배율. "stake 1 MIST가 받았어야 할 배당"은 1 MIST보다
 /// 훨씬 작은 소수라, 1e12를 곱해 u128 정수로 들고 다니다 정산 때 1회 나눠 내린다
@@ -80,18 +83,29 @@ public struct Participant has store {
 // === 정산 수식 (순수 함수 — 상태 접근 없음, 테스트 = 수식 검산) ===
 
 /// day d 탈락자의 환급액 (MIST). 볼록결합 커브 (설계 근거: CURVE_DESIGN §6):
-///   r(d) = α·(d/D) + (1−α)·(d/D)²,  α = alpha_bp/10000
+///   r(k) = α·(k/D) + (1−α)·(k/D)²,  α = alpha_bp/10000
 /// α<1이면 "늦게 탈락할수록 더 챙김" + "하루 더 버티는 가치가 뒤로 갈수록 커짐" 동시 성립.
 ///
+/// [D-05] 커브의 입력은 탈락일 d가 아니라 **완주일수 k = d − 1**이다.
+/// day d에 탈락한 사람이 실제로 성공한 날은 day 1 ~ d−1의 (d−1)일이다.
+/// d를 그대로 쓰면 탈락한 그 날까지 크레딧이 들어가고, 그 오차가 d = D에서
+/// "실패했는데 완주자와 동일한 전액 환급"으로 터진다 (= 마지막 날 무임승차).
+/// k로 옮기면 생존 임금이 전 구간에서 단조증가하고, day1 탈락자 환급은 0이 된다.
+///
+/// 부수 성질: α=1일 때 몰수 = s(D−k)/D, 스트림 길이 = D−d+1 = D−k 이므로
+/// 일일 drip 증가분이 탈락 시점과 무관하게 정확히 s/D로 일정하다 (새 인덱싱에서만 성립).
+///
 /// 정수 연산 변형: 통분해서 소수·분수 제거, 나눗셈은 마지막 1회 (절단 오차 최소화)
-///   환급 = stake × [alpha_bp·d·D + (10000−alpha_bp)·d²] / (10000·D²)
+///   환급 = stake × [alpha_bp·k·D + (10000−alpha_bp)·k²] / (10000·D²)
 /// 분자가 u64 상한(~1.8e19) 근접 → u128 누적 필수.
 ///
-/// ⚠️ PLACEHOLDER: alpha_bp 값은 회의 후 확정 (권장 탐색 [2000, 4000], 임시 10000=순수 선형)
+/// alpha_bp 확정값: 2000 (D-06). 완주자는 이 함수를 타지 않고 finalize에서 원금 전액을 받는다.
 public fun calc_refund(stake: u64, d: u64, total_days: u64, alpha_bp: u64): u64 {
+    // [D-05] 완주일수로 변환. d=0(미탈락 표식)이 들어오는 경로는 없어야 하나 방어적으로 처리
+    let k = if (d == 0) { 0 } else { d - 1 };
     let numer = (stake as u128)
-        * ((alpha_bp as u128) * (d as u128) * (total_days as u128)
-            + ((10000 - alpha_bp) as u128) * (d as u128) * (d as u128));
+        * ((alpha_bp as u128) * (k as u128) * (total_days as u128)
+            + ((10000 - alpha_bp) as u128) * (k as u128) * (k as u128));
     let denom = 10000 * (total_days as u128) * (total_days as u128);
     (numer / denom) as u64
 }
@@ -102,8 +116,10 @@ public fun calc_forfeit(stake: u64, d: u64, total_days: u64, alpha_bp: u64): u64
 }
 
 /// [ver4] 중도 참여자의 커브는 개인 타임라인 기준.
-/// ⚠️ 임시 규칙 (스펙 §5 튜닝 미결 — 중도참여자의 D 정의는 회의 확정 대기):
+/// ⚠️ 임시 규칙 T-03 (중도참여자의 D 정의는 후속 과제):
 ///   d_개인 = failed_day − start_day + 1, D_개인 = total_days − start_day + 1
+/// calc_refund가 내부에서 k = d − 1로 변환하므로 개인 완주일수는
+/// k_개인 = failed_day − start_day 가 되어 [D-05]가 그대로 적용된다.
 /// start_day=1이면 ver3 커브와 정확히 일치 (자연스러운 일반화)
 fun personal_refund(stake: u64, start_day: u64, failed_day: u64, total_days: u64, alpha_bp: u64): u64 {
     calc_refund(stake, failed_day - start_day + 1, total_days - start_day + 1, alpha_bp)
@@ -129,7 +145,8 @@ public fun create_challenge(total_days: u64, alpha_bp: u64, ctx: &mut TxContext)
         vault: balance::zero(),
         participants: table::new(ctx),
         participant_list: vector[],
-        status: STATUS_ACTIVE,
+        // [D-08] 첫 submit_results 전까지는 돈이 잠기지 않는다
+        status: STATUS_PENDING,
     };
     transfer::share_object(ch);
 }
@@ -138,9 +155,12 @@ public fun create_challenge(total_days: u64, alpha_bp: u64, ctx: &mut TxContext)
 /// Move에서 돈은 리소스라 인자로 받은 순간 이 함수가 소유권을 넘겨받고,
 /// 어딘가에 반드시 넣어야(join) 컴파일이 된다 (증발 불가).
 public fun join(ch: &mut Challenge, stake: Coin<SUI>, ctx: &TxContext) {
-    // [ver4] 중도 참여 허용 — 진행 중이고 남은 날이 있으면 언제든.
-    // ⚠️ 참여 마감선은 미결 안건 (스펙 §5 튜닝 미결) — 확정 시 파라미터화
-    assert!(ch.status == STATUS_ACTIVE && ch.current_day < ch.total_days, EJoinClosed);
+    // join은 status에 따라 의미가 둘로 갈린다 (D-08 + ver4):
+    //   PENDING 중 join = 정식 참여 (start_day = 1). withdraw로 철회 가능
+    //   ACTIVE  중 join = 중도 참여 (start_day = current_day + 1). 철회 불가 —
+    //                     이미 스트림이 흐르고 있어 자발적 이탈은 별도 설계 영역(로드맵)
+    // ⚠️ 참여 마감선 τ는 후속 과제 — 확정 시 파라미터화
+    assert!(ch.status != STATUS_ENDED && ch.current_day < ch.total_days, EJoinClosed);
     let sender = ctx.sender();
     assert!(!ch.participants.contains(sender), EAlreadyJoined);
     // ver2: 가변 베팅 — 금액은 자유, 단 0원(지분 0 무임승차)은 거부
@@ -160,13 +180,40 @@ public fun join(ch: &mut Challenge, stake: Coin<SUI>, ctx: &TxContext) {
     ch.participant_list.push_back(sender);
 }
 
+/// [D-08] 참여 철회 — PENDING(첫 결과 제출 전)에서만 가능. 예치금 전액을 돌려받는다.
+///
+/// 이 구간이 있어야 grace 0(무관용)이 정당해진다: "빠질 기회를 명시적으로 줬는데
+/// 안 빠졌다"가 되므로 day1 탈락자의 환급 0이 가혹함이 아니라 본인 선택이 된다.
+/// 펀드의 청약 기간 / 소비자법의 청약 철회기간에 해당하는 구조.
+///
+/// Participant는 drop 능력이 없는 struct이므로 remove 후 반드시 분해(destructure)해야
+/// 컴파일된다 — Move가 "상태를 슬쩍 버리는" 실수를 언어 차원에서 막는 지점.
+public fun withdraw(ch: &mut Challenge, ctx: &mut TxContext): Coin<SUI> {
+    assert!(ch.status == STATUS_PENDING, EWithdrawClosed);
+    let sender = ctx.sender();
+    assert!(ch.participants.contains(sender), ENotParticipant);
+
+    let Participant { stake, start_day: _, acc_entry: _, failed_day: _, claimable: _ } =
+        ch.participants.remove(sender);
+
+    // Table과 vector의 정합성 유지 — 반드시 둘 다 제거한다.
+    // swap_remove는 O(1)이지만 순서가 바뀐다. 순서 의존 로직이 없어 안전
+    let (found, idx) = ch.participant_list.index_of(&sender);
+    assert!(found, ENotParticipant);
+    ch.participant_list.swap_remove(idx);
+
+    coin::from_balance(ch.vault.split(stake), ctx)
+}
+
 /// 그날 탈락자 명단 제출 — 오라클 전용, 호출 1회 = day 1일 진행.
 /// 운영 규칙: 탈락자가 없는 날도 빈 vector로 반드시 호출해야 한다
 /// (총 D회 호출이 종료의 전제 — 수동 day 카운터라 호출 = day 진행).
 public fun submit_results(ch: &mut Challenge, failed: vector<address>, ctx: &TxContext) {
     assert!(ctx.sender() == ch.oracle, ENotOracle);
-    assert!(ch.status == STATUS_ACTIVE, EAlreadyEnded); // 전멸 조기종료 후 호출 차단
+    assert!(ch.status != STATUS_ENDED, EAlreadyEnded); // 전멸 조기종료 후 호출 차단
     assert!(ch.current_day < ch.total_days, EAllDaysSubmitted);
+    // [D-08] 첫 제출 = 돈이 잠기는 순간. 이후 withdraw 불가
+    if (ch.status == STATUS_PENDING) { ch.status = STATUS_ACTIVE; };
     ch.current_day = ch.current_day + 1;
     let d = ch.current_day;
 
@@ -219,7 +266,8 @@ public fun submit_results(ch: &mut Challenge, failed: vector<address>, ctx: &TxC
 /// 가드: D회 제출 완료 전 종료 금지 (ver3에선 스트림 완납 전 종료 = 보존 법칙 붕괴).
 /// 결과가 결정적이라 오라클 제한 없이 누구나 호출 가능.
 public fun finalize(ch: &mut Challenge) {
-    assert!(ch.status == STATUS_ACTIVE, EAlreadyEnded); // claimable 중복 적립 차단
+    assert!(ch.status != STATUS_ENDED, EAlreadyEnded); // claimable 중복 적립 차단
+    // PENDING(한 번도 제출 안 됨)은 current_day=0이라 아래 가드에서 걸린다
     assert!(ch.current_day == ch.total_days, EChallengeNotOver);
     ch.status = STATUS_ENDED;
 
@@ -267,3 +315,24 @@ public fun failed_day_of(ch: &Challenge, who: address): u64 {
 public fun claimable_of(ch: &Challenge, who: address): u64 {
     ch.participants.borrow(who).claimable
 }
+
+public fun stake_of(ch: &Challenge, who: address): u64 {
+    ch.participants.borrow(who).stake
+}
+
+public fun start_day_of(ch: &Challenge, who: address): u64 {
+    ch.participants.borrow(who).start_day
+}
+
+// --- 대시보드(읽기 전용 FE)용 조회 ---
+/// 0 = PENDING, 1 = ACTIVE, 2 = ENDED
+public fun status(ch: &Challenge): u8 { ch.status }
+
+public fun total_days(ch: &Challenge): u64 { ch.total_days }
+
+public fun alpha_bp(ch: &Challenge): u64 { ch.alpha_bp }
+
+public fun daily_drip(ch: &Challenge): u64 { ch.daily_drip }
+
+/// 참가자 주소 전체. FE는 이걸 받아 주소별로 stake/failed_day/claimable을 조회한다
+public fun participant_addresses(ch: &Challenge): vector<address> { ch.participant_list }

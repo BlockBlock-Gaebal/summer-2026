@@ -1,2 +1,5 @@
 figures/
 .claude/
+__pycache__/
+*.pyc
+figures/
