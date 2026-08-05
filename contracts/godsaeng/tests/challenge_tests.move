@@ -14,6 +14,7 @@ const ORACLE: address = @0xFACE; // 방 생성자 = 오라클 (프로토에선 �
 const A: address = @0xA;
 const B: address = @0xB;
 const C: address = @0xC;
+const E: address = @0xE; // T3(4인 dust 케이스)용 4번째 참가자
 
 const ONE_SUI: u64 = 1_000_000_000; // 1 SUI = 10^9 MIST
 const ALPHA_LINEAR: u64 = 10000;    // α=1.0 = 순수 선형 커브 (T1/T3 전제)
@@ -46,6 +47,17 @@ fun setup_abc(scenario: &mut ts::Scenario, total_days: u64, alpha_bp: u64) {
     join_as(scenario, A, 10 * ONE_SUI);
     join_as(scenario, B, 10 * ONE_SUI);
     join_as(scenario, C, 10 * ONE_SUI);
+}
+
+// [D-08] who가 PENDING 구간에서 참여 철회, 돌려받은 금액(MIST)을 반환
+fun withdraw_as(scenario: &mut ts::Scenario, who: address): u64 {
+    scenario.next_tx(who);
+    let mut ch = scenario.take_shared<Challenge>();
+    let back = challenge::withdraw(&mut ch, scenario.ctx());
+    let amount = back.value();
+    back.burn_for_testing();
+    ts::return_shared(ch);
+    amount
 }
 
 fun finalize_as(scenario: &mut ts::Scenario, who: address) {
@@ -172,8 +184,9 @@ fun test_submit_beyond_total_days_fails() {
 
 // ============================================================
 // ver3 — T2: 커브 단위 테스트 (calc_refund 단독 검산)
-// 스펙 §4: α=0.3 (alpha_bp=3000), D=5, stake=10 SUI
-// r(d) = 0.3(d/5) + 0.7(d/5)² — 기대값 표 그대로, 전부 MIST 정수로 정확
+// [D-06] α=0.2 (alpha_bp=2000), D=5, stake=10 SUI
+// [D-05] 커브 입력은 완주일수 k = d−1. day d 탈락자는 day1~d−1의 (d−1)일만 성공한 것
+// r(k) = 0.2(k/5) + 0.8(k/5)² — 전부 MIST 정수로 정확 (분자 10000k+8000k², 분모 250000)
 // ============================================================
 
 #[test]
@@ -181,19 +194,21 @@ fun test_t2_curve_unit() {
     let stake = 10 * ONE_SUI;
     // | d      | 1    | 2    | 3    | 4    | 5     |
     // | 환급   | 0.88 | 2.32 | 4.32 | 6.88 | 10.00 |
-    assert!(challenge::calc_refund(stake, 1, 5, 3000) ==   880_000_000);
-    assert!(challenge::calc_refund(stake, 2, 5, 3000) == 2_320_000_000);
-    assert!(challenge::calc_refund(stake, 3, 5, 3000) == 4_320_000_000);
-    assert!(challenge::calc_refund(stake, 4, 5, 3000) == 6_880_000_000);
-    assert!(challenge::calc_refund(stake, 5, 5, 3000) == 10 * ONE_SUI); // 완주 직전까지 가면 전액
+    // day1 탈락 = k0 = 하루도 성공 못 함 → 환급 0
+    assert!(challenge::calc_refund(stake, 1, 5, 2000) ==             0);
+    assert!(challenge::calc_refund(stake, 2, 5, 2000) ==   720_000_000);
+    assert!(challenge::calc_refund(stake, 3, 5, 2000) == 2_080_000_000);
+    assert!(challenge::calc_refund(stake, 4, 5, 2000) == 4_080_000_000);
+    // day5(마지막 날) 탈락 = k4. 완주자(전액)와 3.28 SUI 차이 — 마지막 날 무임승차 제거
+    assert!(challenge::calc_refund(stake, 5, 5, 2000) == 6_720_000_000);
 
     // 몰수 = stake − 환급 (보존: 환급+몰수 = stake)
-    assert!(challenge::calc_forfeit(stake, 1, 5, 3000) == 9_120_000_000);
-    assert!(challenge::calc_forfeit(stake, 5, 5, 3000) == 0);
+    assert!(challenge::calc_forfeit(stake, 1, 5, 2000) == 10 * ONE_SUI);
+    assert!(challenge::calc_forfeit(stake, 5, 5, 2000) ==  3_280_000_000);
 
     // α=1.0 (alpha_bp=10000) = 순수 선형: r(d) = d/D → T1/T3의 전제 검산
-    assert!(challenge::calc_refund(stake, 2, 5, 10000) == 4 * ONE_SUI);
-    assert!(challenge::calc_refund(stake, 4, 5, 10000) == 8 * ONE_SUI);
+    assert!(challenge::calc_refund(stake, 2, 5, 10000) == 2 * ONE_SUI); // k=1 → 1/5
+    assert!(challenge::calc_refund(stake, 4, 5, 10000) == 6 * ONE_SUI); // k=3 → 3/5
 }
 
 // ============================================================
@@ -203,7 +218,7 @@ fun test_t2_curve_unit() {
 //   day3: drip 1.5 → A/C 각 +0.75
 //   day4: C 몰수 2 → drip += 2/2 = 1.0 (drip=2.5), A만 +2.5
 //   day5: drip 2.5 → A +2.5
-// 기대: A = 16.5 / C = 9.5 / B = 4.0 SUI, dust = 0
+// [D-05 적용] 기대: A = 20 / C = 8 / B = 2 SUI, dust = 0
 // ============================================================
 
 #[test]
@@ -212,28 +227,28 @@ fun test_t1_streaming_settlement() {
     setup_abc(&mut scenario, 5, ALPHA_LINEAR);
 
     submit_as(&mut scenario, ORACLE, vector[]);  // day1
-    submit_as(&mut scenario, ORACLE, vector[B]); // day2: B 탈락 (몰수 6)
+    submit_as(&mut scenario, ORACLE, vector[B]); // day2: B 탈락 (k=1, 환급 2, 몰수 8)
     submit_as(&mut scenario, ORACLE, vector[]);  // day3
-    submit_as(&mut scenario, ORACLE, vector[C]); // day4: C 탈락 (몰수 2)
+    submit_as(&mut scenario, ORACLE, vector[C]); // day4: C 탈락 (k=3, 환급 6, 몰수 4)
 
-    // ★ 킬러 슬라이드 포인트: C는 탈락했지만 생존 기간(day2~3)의 배당 1.5 SUI는 이미 적립
+    // ★ 킬러 슬라이드 포인트: C는 탈락했지만 생존 기간(day2~3)의 배당 2 SUI는 이미 적립
     //   (그날 탈락자는 그날 배당 제외 → day4 몫은 없음. 적립분은 회수하지 않음)
     scenario.next_tx(ORACLE);
     let ch = scenario.take_shared<Challenge>();
-    assert!(challenge::claimable_of(&ch, C) == 1_500_000_000);
+    assert!(challenge::claimable_of(&ch, C) == 2_000_000_000);
     ts::return_shared(ch);
 
     submit_as(&mut scenario, ORACLE, vector[]);  // day5
     finalize_as(&mut scenario, ORACLE);
 
     // 기대값 (스펙 표 그대로): A는 C가 못 받은 스트림 잔여분까지 흡수
-    assert!(claim_as(&mut scenario, A) == 16_500_000_000); // 원금 10 + 배당 6.5
-    assert!(claim_as(&mut scenario, C) ==  9_500_000_000); // 환급 8 + 배당 1.5
-    assert!(claim_as(&mut scenario, B) ==  4_000_000_000); // 환급 4 (r(2)=2/5)
+    assert!(claim_as(&mut scenario, A) == 20_000_000_000); // 원금 10 + 배당 10
+    assert!(claim_as(&mut scenario, C) ==  8_000_000_000); // 환급 6 + 배당 2
+    assert!(claim_as(&mut scenario, B) ==  2_000_000_000); // 환급 2 (k=1 → r=1/5)
 
     scenario.next_tx(ORACLE);
     let ch = scenario.take_shared<Challenge>();
-    // 보존 법칙: 16.5 + 9.5 + 4.0 = 30 SUI, dust = 0 (전 나눗셈이 정확히 나누어떨어짐)
+    // 보존 법칙: 20 + 8 + 2 = 30 SUI, dust = 0 (α=1에서 drip 증가분이 항상 s/D로 일정)
     assert!(challenge::vault_value(&ch) == 0);
     ts::return_shared(ch);
     scenario.end();
@@ -242,14 +257,17 @@ fun test_t1_streaming_settlement() {
 // ============================================================
 // ver3 — T3: dust 검증 (α=1.0, B day3만 탈락)
 // 스펙 §4: B 몰수 4e9 → drip = 4e9/3 = 1,333,333,333 (절단)
-//   day3~5: A/C 각 floor(1,333,333,333 × 10/20) = 666,666,666/일 × 3일
-// 기대: A = C = 11,999,999,998 / B = 6e9, dust 4 MIST ≤ 상계 5×(3+1)=20
+//   [D-05 부수성질] α=1에서 drip 증가분이 항상 s/D로 일정 → 3인 균등 시 전부 정확히
+//   나누어떨어져 dust가 0이 된다. dust 검증 기능을 되살리려면 생존자 수가 3 이상이어야 함
+//   → 4인(A/B/C/E)으로 교체. B day3 탈락(k=2, 환급 4, 몰수 6) → drip 2, 생존 3인 지분합 30
+// 기대: A = C = E = 11,999,999,999 / B = 4e9, dust 3 ≤ 상계 5×(4+1)=25
 // ============================================================
 
 #[test]
 fun test_t3_dust_bound() {
     let mut scenario = ts::begin(ORACLE);
     setup_abc(&mut scenario, 5, ALPHA_LINEAR);
+    join_as(&mut scenario, E, 10 * ONE_SUI); // 4번째 참가자 — 생존자 3인을 만들어 절단 유발
 
     submit_as(&mut scenario, ORACLE, vector[]);  // day1
     submit_as(&mut scenario, ORACLE, vector[]);  // day2
@@ -258,20 +276,20 @@ fun test_t3_dust_bound() {
     submit_as(&mut scenario, ORACLE, vector[]);  // day5
     finalize_as(&mut scenario, ORACLE);
 
-    // [ver4 갱신] acc_per_share 채택으로 배당 절단이 "매일"에서 "정산 시점 1회"로 이동:
-    //   ver3 직접적립: floor(666,666,666.5)×3일 = 1,999,999,998 → 11,999,999,998, dust 4
-    //   ver4 acc:      floor(1,999,999,999.5) 1회  = 1,999,999,999 → 11,999,999,999, dust 2
-    // 절단 횟수 감소 = 유저에게 유리한 방향, 상계는 동일하게 성립 (스펙 dust 상계 논리 유지)
+    // acc_per_share는 절단이 "정산 시점 1회"라 매일 절단보다 유저에게 유리한 방향:
+    //   acc 누적 = floor(2e9×1e12/30e9) × 3일 = 66,666,666,666 × 3
+    //   개인 배당 = floor(10e9 × 199,999,999,998 / 1e12) = 1,999,999,999
     assert!(claim_as(&mut scenario, A) == 11_999_999_999);
     assert!(claim_as(&mut scenario, C) == 11_999_999_999);
-    assert!(claim_as(&mut scenario, B) ==  6_000_000_000);
+    assert!(claim_as(&mut scenario, E) == 11_999_999_999);
+    assert!(claim_as(&mut scenario, B) ==  4_000_000_000); // k=2 → r=2/5
 
     scenario.next_tx(ORACLE);
     let ch = scenario.take_shared<Challenge>();
     let dust = challenge::vault_value(&ch);
     // 이중 검증 (스펙 §1-4): 정확값 + 상계 — 상계 assert가 "dust인 줄 알았던 로직 버그"를 잡는다
-    assert!(dust == 2);                       // 합 29,999,999,998 + 2 = 30 SUI
-    assert!(dust <= 5 * (3 + 1));             // dust ≤ total_days × (인원+1) MIST
+    assert!(dust == 3);                       // 합 39,999,999,997 + 3 = 40 SUI
+    assert!(dust <= 5 * (4 + 1));             // dust ≤ total_days × (인원+1) MIST
     ts::return_shared(ch);
     scenario.end();
 }
@@ -302,9 +320,9 @@ fun test_v4_midjoin_excluded_from_prior_dividends() {
     submit_as(&mut scenario, ORACLE, vector[]);  // day5
     finalize_as(&mut scenario, ORACLE);
 
-    assert!(claim_as(&mut scenario, A) == 13_750_000_000); // 10 + 1.5 + 0.75×3
-    assert!(claim_as(&mut scenario, C) == 12_250_000_000); // 10 + 0.75×3 (day2 몫 없음)
-    assert!(claim_as(&mut scenario, B) ==  4_000_000_000);
+    assert!(claim_as(&mut scenario, A) == 15_000_000_000); // 10 + 1.5 + 0.75×3
+    assert!(claim_as(&mut scenario, C) == 13_000_000_000); // 10 + 0.75×3 (day2 몫 없음)
+    assert!(claim_as(&mut scenario, B) ==  2_000_000_000);
 
     scenario.next_tx(ORACLE);
     let ch = scenario.take_shared<Challenge>();
@@ -333,13 +351,13 @@ fun test_v4_midjoin_personal_timeline_curve() {
     submit_as(&mut scenario, ORACLE, vector[]);  // day5
     finalize_as(&mut scenario, ORACLE);
 
-    assert!(claim_as(&mut scenario, A) == 18_583_333_334);
-    assert!(claim_as(&mut scenario, C) ==  7_416_666_666); // 환급 6,666,666,666 + 배당 0.75
-    assert!(claim_as(&mut scenario, B) ==  4_000_000_000);
+    assert!(claim_as(&mut scenario, A) == 23_666_666_666);
+    assert!(claim_as(&mut scenario, C) ==  4_333_333_333); // 환급 6,666,666,666 + 배당 0.75
+    assert!(claim_as(&mut scenario, B) ==  2_000_000_000);
 
     scenario.next_tx(ORACLE);
     let ch = scenario.take_shared<Challenge>();
-    assert!(challenge::vault_value(&ch) == 0);
+    assert!(challenge::vault_value(&ch) == 1);
     ts::return_shared(ch);
     scenario.end();
 }
@@ -365,9 +383,12 @@ fun test_join_after_last_day_fails() {
 fun test_annihilation_early_end() {
     let mut scenario = ts::begin(ORACLE);
     setup_abc(&mut scenario, 2, ALPHA_LINEAR);
-    submit_as(&mut scenario, ORACLE, vector[A, B, C]); // day1: 전원 동시 탈락
+    submit_as(&mut scenario, ORACLE, vector[]);        // day1: 전원 생존
+    submit_as(&mut scenario, ORACLE, vector[A, B, C]); // day2: 전원 동시 탈락
 
-    // finalize 없이 조기 ENDED → 커브 환급 r(1) = 1/2 → 각자 5 SUI
+    // finalize 없이 조기 ENDED → 커브 환급 r(k=1) = 1/2 → 각자 5 SUI
+    // ⚠️ day1 전멸이면 k=0이라 전원 환급 0 = 전액 vault 잔류 + claim이 ENothingToClaim으로
+    //    abort한다. T-02(전멸 임시규칙)의 실질 심각도가 D-05로 커진 지점 — 후속 확정 필요
     assert!(claim_as(&mut scenario, A) == 5 * ONE_SUI);
     assert!(claim_as(&mut scenario, B) == 5 * ONE_SUI);
     assert!(claim_as(&mut scenario, C) == 5 * ONE_SUI);
@@ -443,5 +464,68 @@ fun test_double_finalize_fails() {
     submit_as(&mut scenario, ORACLE, vector[]);
     finalize_as(&mut scenario, ORACLE);
     finalize_as(&mut scenario, ORACLE); // → abort
+    scenario.end();
+}
+
+// ============================================================
+// [D-08] PENDING 구간 — 첫 결과 제출 전 자유 참여/철회
+// 이 구간이 있어야 grace 0(무관용)이 정당해진다:
+// "빠질 기회를 명시적으로 줬는데 안 빠졌다" → day1 탈락자 환급 0이 본인 선택이 됨
+// ============================================================
+
+#[test]
+fun test_withdraw_in_pending_returns_full_stake() {
+    let mut scenario = ts::begin(ORACLE);
+    setup_abc(&mut scenario, 5, ALPHA_LINEAR);
+
+    assert!(withdraw_as(&mut scenario, C) == 10 * ONE_SUI); // 전액 반환
+
+    scenario.next_tx(ORACLE);
+    let ch = scenario.take_shared<Challenge>();
+    assert!(challenge::vault_value(&ch) == 20 * ONE_SUI);   // 30 − 10
+    assert!(challenge::participant_count(&ch) == 2);        // Table/vector 정합성
+    assert!(challenge::status(&ch) == 0);                   // 여전히 PENDING
+    ts::return_shared(ch);
+
+    // 남은 2인으로 정상 진행되는지 (철회가 이후 정산을 오염시키지 않는가)
+    submit_as(&mut scenario, ORACLE, vector[B]); // day1: B 탈락 (k=0, 환급 0, 몰수 10)
+    submit_as(&mut scenario, ORACLE, vector[]);
+    submit_as(&mut scenario, ORACLE, vector[]);
+    submit_as(&mut scenario, ORACLE, vector[]);
+    submit_as(&mut scenario, ORACLE, vector[]);
+    finalize_as(&mut scenario, ORACLE);
+
+    assert!(claim_as(&mut scenario, A) == 20 * ONE_SUI); // 원금 10 + B 몰수 10 전액 흡수
+
+    scenario.next_tx(ORACLE);
+    let ch = scenario.take_shared<Challenge>();
+    assert!(challenge::claimable_of(&ch, B) == 0); // day1 탈락 = k0 = 환급 0
+    assert!(challenge::vault_value(&ch) == 0);     // 보존, dust 0
+    ts::return_shared(ch);
+    scenario.end();
+}
+
+#[test, expected_failure(abort_code = challenge::EWithdrawClosed)]
+fun test_withdraw_after_first_submit_fails() {
+    let mut scenario = ts::begin(ORACLE);
+    setup_abc(&mut scenario, 5, ALPHA_LINEAR);
+    submit_as(&mut scenario, ORACLE, vector[]); // 첫 제출 = 돈이 잠기는 순간 (PENDING→ACTIVE)
+    withdraw_as(&mut scenario, C);              // abort
+    scenario.end();
+}
+
+#[test]
+fun test_rejoin_after_withdraw() {
+    let mut scenario = ts::begin(ORACLE);
+    setup_abc(&mut scenario, 5, ALPHA_LINEAR);
+    withdraw_as(&mut scenario, C);
+    join_as(&mut scenario, C, 10 * ONE_SUI); // 철회 후 재참여 — 중복참여 가드와 충돌하지 않아야
+
+    scenario.next_tx(ORACLE);
+    let ch = scenario.take_shared<Challenge>();
+    assert!(challenge::participant_count(&ch) == 3);
+    assert!(challenge::vault_value(&ch) == 30 * ONE_SUI);
+    assert!(challenge::start_day_of(&ch, C) == 1); // PENDING 재참여는 정식 참여(start_day=1)
+    ts::return_shared(ch);
     scenario.end();
 }

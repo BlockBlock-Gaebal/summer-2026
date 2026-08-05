@@ -33,17 +33,22 @@ import os
 import platform
 
 # ---------------------------------------------------------------- 폰트/스타일
+# ⚠️ style.use()는 rcParams를 통째로 리셋하므로 반드시 폰트 설정보다 먼저 호출할 것
+#    (순서가 뒤바뀌면 어느 OS에서든 한글이 네모로 깨진다)
+plt.style.use("seaborn-v0_8-whitegrid")
+
 # 리눅스(원 개발 환경) 기준 경로. Windows/Mac에서 폰트가 깨지면 아래 분기를 참고해 수정.
 if platform.system() == "Windows":
     plt.rcParams["font.family"] = "Malgun Gothic"
 elif platform.system() == "Darwin":
     plt.rcParams["font.family"] = "AppleGothic"
 else:
-    _KR = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
-    if os.path.exists(_KR):
-        font_manager.fontManager.addfont(_KR)
-        plt.rcParams["font.family"] = font_manager.FontProperties(fname=_KR).get_name()
-plt.style.use("seaborn-v0_8-whitegrid")
+    for _KR in ("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+                "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"):
+        if os.path.exists(_KR):
+            font_manager.fontManager.addfont(_KR)
+            plt.rcParams["font.family"] = font_manager.FontProperties(fname=_KR).get_name()
+            break
 plt.rcParams["axes.unicode_minus"] = False
 plt.rcParams.update({"figure.dpi": 150, "font.size": 11,
                      "axes.titlesize": 13, "axes.titleweight": "bold"})
@@ -56,10 +61,16 @@ os.makedirs(FIGDIR, exist_ok=True)
 
 
 # ================================================================ 핵심 수식
-def retention(d: float, D: int, alpha: float) -> float:
-    """day d 탈락 시 환급률 r(d) ∈ [0,1]. d=D(완주)면 1."""
-    x = d / D
+def curve(x: float, alpha: float) -> float:
+    """볼록결합 커브 R(x) = α·x + (1−α)·x², x ∈ [0,1]."""
     return alpha * x + (1.0 - alpha) * x * x
+
+
+def retention(d: float, D: int, alpha: float) -> float:
+    """[D-05] day d 탈락 시 환급률. 커브 입력은 탈락일이 아니라 완주일수 k = d − 1.
+    day d 탈락자가 실제로 성공한 날은 day 1 ~ d−1의 (d−1)일이기 때문.
+    day1 탈락 → 0, 완주(k=D) → 1."""
+    return curve(max(d - 1.0, 0.0) / D, alpha)
 
 
 def forfeit(stake: float, d: int, D: int, alpha: float) -> float:
@@ -122,10 +133,12 @@ def settle(stakes: dict, fail_days: dict, D: int, alpha: float,
 
 # ================================================================ 분석 도구
 def staying_wage_curve(D: int, alpha: float, stake: float = 1.0) -> np.ndarray:
-    """환급 성분만의 생존 임금 w_r(d) = stake·[r(d+1) - r(d)], d = 1..D-1"""
-    d = np.arange(1, D)
-    return stake * (np.vectorize(retention)(d + 1, D, alpha)
-                    - np.vectorize(retention)(d, D, alpha))
+    """[D-05] 환급 성분만의 생존 임금 w_r(d) = stake·[R(d/D) − R((d−1)/D)], d = 1..D.
+    구 인덱싱은 d = 1..D−1까지만 정의되고 마지막 날 가치가 0으로 떨어졌으나(무임승차),
+    k = d−1로 옮기면 d = D(마지막 날)까지 전 구간 단조증가한다."""
+    d = np.arange(1, D + 1)
+    return stake * (np.vectorize(curve)(d / D, alpha)
+                    - np.vectorize(curve)((d - 1) / D, alpha))
 
 
 def payoff_table_by_dropday(D: int, alpha: float, n_players: int = 5,
@@ -175,31 +188,31 @@ def monte_carlo(D: int, alpha: float, n_players: int = 10, stake: float = 10.0,
 
 
 # ================================================================ 그래프
-def fig_retention_curves(D=30, alphas=(0.0, 0.3, 0.6, 1.0)):
+def fig_retention_curves(D=30, alphas=(0.0, 0.2, 0.6, 1.0)):
     fig, ax = plt.subplots(figsize=(9, 5.5))
     d = np.linspace(0, D, 200)
     colors = [C_PURPLE, C_BLUE, C_GREEN, C_GRAY]
     for a, c in zip(alphas, colors):
-        r = a * (d / D) + (1 - a) * (d / D) ** 2
+        r = a * (d / D) + (1 - a) * (d / D) ** 2  # x = k/D
         ls = "--" if a == 1.0 else "-"
         ax.plot(d, r * 100, ls, color=c, lw=2.2,
                 label=f"α={a:.1f}" + ("  (순수 선형)" if a == 1 else "  (순수 이차)" if a == 0 else ""))
-    ax.set_title("환급 커브 r(d): α가 낮을수록 볼록 (후반 급회복)")
-    ax.set_xlabel("탈락일 d"); ax.set_ylabel("환급률 (%)")
+    ax.set_title("환급 커브 R(k): α가 낮을수록 볼록 (후반 급회복)")
+    ax.set_xlabel("완주일수 k  (= 탈락일 d − 1)"); ax.set_ylabel("환급률 (%)")
     ax.legend(); ax.set_xlim(0, D); ax.set_ylim(0, 100)
     plt.tight_layout(); plt.savefig(f"{FIGDIR}/01_retention_curves.png", bbox_inches="tight"); plt.close()
 
 
-def fig_staying_wage(D=30, alphas=(0.0, 0.3, 0.6, 1.0), stake=100000):
+def fig_staying_wage(D=30, alphas=(0.0, 0.2, 0.6, 1.0), stake=100000):
     fig, ax = plt.subplots(figsize=(9, 5.5))
     colors = [C_PURPLE, C_BLUE, C_GREEN, C_GRAY]
-    d = np.arange(1, D)
+    d = np.arange(1, D + 1)
     for a, c in zip(alphas, colors):
         w = staying_wage_curve(D, a, stake)
         ax.plot(d, w, color=c, lw=2.2, label=f"α={a:.1f}")
     cost = 1500 + 4200 * (d / D) ** 1.4
     ax.plot(d, cost, ":", color=C_RED, lw=2, label="노력 비용 c(d) 개형 (가정)")
-    ax.set_title("생존 임금 w(d): α<1 이면 우상향 → 비용 곡선을 끝까지 이김")
+    ax.set_title("생존 임금 w(d): [D-05] 마지막 날(d=D)까지 단조증가 — 절벽 없음")
     ax.set_xlabel("day d"); ax.set_ylabel("하루 더 버티는 가치 (원)")
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, p: f"{x:,.0f}"))
     ax.legend()
@@ -240,7 +253,7 @@ def fig_flow_compare(D=5):
     plt.tight_layout(); plt.savefig(f"{FIGDIR}/03_flow_compare.png", bbox_inches="tight"); plt.close()
 
 
-def fig_payoff_by_dropday(D=30, alphas=(0.0, 0.3, 0.6, 1.0), stake=10.0):
+def fig_payoff_by_dropday(D=30, alphas=(0.0, 0.2, 0.6, 1.0), stake=10.0):
     fig, ax = plt.subplots(figsize=(9, 5.5))
     colors = [C_PURPLE, C_BLUE, C_GREEN, C_GRAY]
     for a, c in zip(alphas, colors):
@@ -273,7 +286,7 @@ if __name__ == "__main__":
     pd.set_option("display.float_format", lambda v: f"{v:,.3f}")
 
     D = 30
-    ALPHAS = [0.0, 0.3, 0.6, 1.0]
+    ALPHAS = [0.0, 0.2, 0.6, 1.0]
 
     SCENARIOS = {
         "S1_킬러예시(D=5)": dict(D=5, stakes={"A": 10, "B": 10, "C": 10},
