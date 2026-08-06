@@ -141,7 +141,7 @@ def settle_v4(players, D, alpha, design):
 
 
 # ================================================================ 고속 MC (스나이퍼 1명, 2버킷 빈티지)
-def mc_entry_timing(D=30, n_inc=8, stake=10.0, alpha=0.3,
+def mc_entry_timing(D=30, n_inc=8, stake=10.0, alpha=0.2,
                     base_h=0.06, decay=0.92, n_sims=600, seed=7):
     """
     기존 8인(확률적 탈락) + 절대 실패하지 않는 합류자(스나이퍼) 1명.
@@ -223,7 +223,7 @@ def mc_entry_timing(D=30, n_inc=8, stake=10.0, alpha=0.3,
 
 
 # ================================================================ 그래프
-def fig_donation_trap(D=30, alpha=0.3, stake=10.0):
+def fig_donation_trap(D=30, alpha=0.2, stake=10.0):
     gs = np.arange(1, D + 1)
     orig = [stake * retention(D - g + 1, D, alpha) for g in gs]   # 원기간 D 기준: 완주해도 r<1
     norm = [stake for _ in gs]                                     # 개인 정규화: 완주 = 전액
