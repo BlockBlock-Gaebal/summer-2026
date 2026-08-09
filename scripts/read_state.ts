@@ -355,9 +355,16 @@ export function shortAddress(addr: string, head = 6, tail = 4): string {
   return `${addr.slice(0, head + 2)}…${addr.slice(-tail)}`;
 }
 
-// === CLI ===
-// 모듈로 import될 때는 실행되지 않는다. 조회 로직(위)과 출력(아래)을 분리해 둔 이유는
-// 승준의 대시보드가 같은 함수를 import해서 쓰되 출력은 자기 방식으로 하기 위함이다.
+// ═══════════════════════════════════════════════════════════════════════
+// ▼▼▼ 여기부터 파일 끝까지는 CLI 전용이다 ▼▼▼
+//
+// 📌 프론트엔드(승준)로 이 파일을 복사할 때는 **이 줄부터 파일 끝까지 통째로 지운다.**
+//    Node 전용 기능(process, dotenv)을 쓰기 때문에 브라우저에서는 필요 없다.
+//    위쪽(조회 로직 + 타입 + 표시 헬퍼)만 남기면 그대로 쓸 수 있다.
+//
+// 조회 로직(위)과 출력(아래)을 분리해 둔 이유가 이것이다 —
+// 대시보드는 같은 함수를 쓰되 출력은 React로 하면 된다.
+// ═══════════════════════════════════════════════════════════════════════
 
 function renderSnapshot(snap: ChallengeSnapshot): string {
   const { challenge: c, participants, warnings } = snap;
@@ -464,12 +471,25 @@ async function main(): Promise<void> {
   }
 }
 
-// ESM에서 "직접 실행되었는가" 판정.
-// import된 경우 process.argv[1]과 이 파일 경로가 다르므로 main()이 돌지 않는다.
-const invokedDirectly =
-  process.argv[1] !== undefined &&
-  import.meta.url === new URL(`file://${process.argv[1]}`).href;
+/**
+ * ESM에서 "직접 실행되었는가" 판정.
+ * import된 경우 process.argv[1]과 이 파일 경로가 다르므로 main()이 돌지 않는다.
+ *
+ * `typeof process` 가드가 있는 이유: 브라우저에는 process가 아예 없어서
+ * 그냥 `process.argv`를 읽으면 ReferenceError로 죽는다.
+ * (그래도 프론트로 복사할 때는 위 배너부터 지우는 편이 깔끔하다)
+ */
+function isDirectRun(): boolean {
+  if (typeof process === 'undefined' || !Array.isArray(process.argv)) return false;
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return import.meta.url === new URL(`file://${entry}`).href;
+  } catch {
+    return false;
+  }
+}
 
-if (invokedDirectly) {
+if (isDirectRun()) {
   await main();
 }
