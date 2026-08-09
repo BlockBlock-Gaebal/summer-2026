@@ -1,0 +1,23 @@
+{
+  "name": "godsaeng-scripts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "갓생 내기 — 오라클 / 데모 자동화 스크립트 (읽기: read_state, 쓰기: seed/submit)",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "read-state": "tsx read_state.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mysten/sui": "^1.30.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  }
+}
