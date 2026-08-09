@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    // ESM. package.json의 "type": "module"과 짝을 이룬다.
+    // NodeNext를 쓰면 상대 경로 import에 확장자(.js)를 붙여야 하는 규칙이 강제되는데,
+    // tsx로 직접 실행할 것이므로 Bundler 해석을 써서 확장자 없이 쓴다.
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "types": ["node"],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // 타입 검사만 한다. 실행은 tsx가 담당.
+    "noEmit": true
+  },
+  "include": ["*.ts", "**/*.ts"],
+  "exclude": ["node_modules"]
+}

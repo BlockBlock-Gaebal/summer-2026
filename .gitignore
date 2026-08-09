@@ -3,3 +3,15 @@ figures/
 __pycache__/
 *.pyc
 figures/
+
+# --- 비밀값 ---
+# 개인키·니모닉이 들어가는 파일. 퍼블릭 레포이므로 절대 커밋 금지.
+.env
+.env.*
+# 단 예시 파일은 추적한다 (값이 비어 있는 템플릿)
+!.env.example
+
+# --- Node ---
+node_modules/
+dist/
+*.tsbuildinfo

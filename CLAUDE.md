@@ -42,10 +42,17 @@
 |---|---|
 | 체인 | **Sui Testnet** (Devnet 아님 — 주기적 초기화 리스크) |
 | 컨트랙트 | Sui Move 2024 에디션, Sui CLI |
-| 대시보드 | Vite + React + TypeScript, `@mysten/sui` (RPC 읽기 전용) |
-| 스크립트 | TypeScript + `@mysten/sui` |
-| 환경 | WSL(Ubuntu), Node v20, yarn, VS Code |
+| 대시보드 | Vite + React + TypeScript, `@mysten/sui`의 `SuiGrpcClient` (읽기 전용) |
+| 스크립트 | TypeScript + `@mysten/sui`의 `SuiGrpcClient` |
+| 환경 | WSL(Ubuntu), Node v20, npm, VS Code |
 | 저장소 | GitHub `BlockBlock-Gaebal/summer-2026` |
+
+> **⚠️ 공개 풀노드의 JSON-RPC는 폐지되었다.** `SuiClient`를 쓰면 전 메서드가 `MethodNotFound`로 실패한다.
+> 반드시 `SuiGrpcClient`를 쓸 것 (D-23). 생성자 옵션은 `url`이 아니라 `baseUrl`이며,
+> `core.getObject()`는 조용히 틀린 값을 주므로 `ledgerService` + readMask `json`을 쓴다.
+> 조회 로직은 `scripts/read_state.ts`에 공용화되어 있으니 직접 짜지 말 것.
+>
+> 패키지 매니저는 실제 환경에 yarn이 없어 npm을 쓴다 (`scripts/package-lock.json`).
 
 ## 5. 아키텍처 원칙
 
