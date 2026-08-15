@@ -56,6 +56,28 @@ async function pollSnapshot(
   return snap;
 }
 
+/**
+ * finalize()를 부르고 ENDED가 반영될 때까지 기다린다. day 진행 직후와, "이미 마지막
+ * 날까지 제출됐지만 finalize는 아직 안 된" 상태(바로 아래 버그 설명) 양쪽에서 쓴다.
+ */
+async function finalizeAndWait(
+  client: Parameters<typeof readState>[0],
+  packageId: string,
+  challengeId: string,
+  oracle: ReturnType<typeof loadOracleKeypair>,
+): Promise<Awaited<ReturnType<typeof readState>>> {
+  console.log('\nfinalize() 호출...');
+  const finalizeTx = new Transaction();
+  const finalizeRef = await sharedObjectRef(client, challengeId);
+  finalizeTx.moveCall({
+    target: `${packageId}::challenge::finalize`,
+    arguments: [finalizeTx.sharedObjectRef(finalizeRef)],
+  });
+  const finalizeResult = await signAndExecute(client, finalizeTx, oracle);
+  console.log(`finalize 완료 (digest: ${finalizeResult.digest})`);
+  return pollSnapshot(client, challengeId, (s) => s.challenge.status === STATUS.ENDED);
+}
+
 function loadChallengeId(): string {
   if (!existsSync(STATE_FILE)) {
     throw new Error('scripts/.demo-state.json이 없다 — 먼저 `npm run seed`로 데모 방을 만들 것');
@@ -92,20 +114,35 @@ async function main(): Promise<void> {
     throw new Error('참가자 0명인 방이다 — submit_results를 호출하면 즉시 전멸 처리되어 영구 잠긴다. 중단.');
   }
 
+  if (Number(c.currentDay) === Number(c.totalDays)) {
+    // 이미 total_days만큼 다 제출된 상태 (예: 직전 실행이 마지막 날 제출엔 성공했지만
+    // 그 직후 read_state의 반영 지연 때문에 finalize 자동 호출까지는 못 갔던 경우 —
+    // 실측으로 확인된 경로다). submit_results를 다시 부르면 EAllDaysSubmitted로
+    // abort하므로, submit 없이 finalize만 마저 부른다.
+    console.log('이미 마지막 날까지 제출된 상태다 — submit 없이 finalize()만 호출한다.');
+    const final = await finalizeAndWait(client, packageId, challengeId, oracle);
+    printSummary(final);
+    console.log(`\n상태 확인: npm run read-state -- ${challengeId}\n`);
+    return;
+  }
+
   const nextDay = Number(c.currentDay) + 1;
   const role = SCHEDULE[nextDay];
   let failed: string[] = [];
 
   if (role) {
     const addr = process.env[`PARTICIPANT_${role}_ADDRESS`];
-    const survivor = addr ? before.participants.find((p) => p.address === addr && p.failedDay === 0n) : undefined;
-    if (survivor) {
+    const participant = addr ? before.participants.find((p) => p.address === addr) : undefined;
+    if (participant && participant.failedDay === 0n) {
       failed = [addr!];
       console.log(`day ${nextDay}: 예정대로 ${role}(${shortAddress(addr!)}) 탈락 제출`);
     } else {
-      console.log(
-        `day ${nextDay}: ${role} 탈락이 예정돼 있으나 ${addr ? `${shortAddress(addr)}가 아직 참여자가 아니다` : 'PARTICIPANT_' + role + '_ADDRESS가 없다'} — 오늘은 탈락자 없이 진행`,
-      );
+      const reason = !addr
+        ? `PARTICIPANT_${role}_ADDRESS가 없다`
+        : !participant
+          ? `${shortAddress(addr)}가 아직 참여자가 아니다`
+          : `${shortAddress(addr)}는 이미 day${participant.failedDay}에 탈락 처리됨`;
+      console.log(`day ${nextDay}: ${role} 탈락이 예정돼 있으나 ${reason} — 오늘은 탈락자 없이 진행`);
     }
   } else {
     console.log(`day ${nextDay}: 예정된 탈락자 없음 — 빈 명단으로 진행`);
@@ -126,16 +163,8 @@ async function main(): Promise<void> {
 
   let final = after;
   if (after.challenge.currentDay === after.challenge.totalDays && after.challenge.status !== STATUS.ENDED) {
-    console.log('\n마지막 날 제출 완료 — finalize() 호출...');
-    const finalizeTx = new Transaction();
-    const finalizeRef = await sharedObjectRef(client, challengeId);
-    finalizeTx.moveCall({
-      target: `${packageId}::challenge::finalize`,
-      arguments: [finalizeTx.sharedObjectRef(finalizeRef)],
-    });
-    const finalizeResult = await signAndExecute(client, finalizeTx, oracle);
-    console.log(`finalize 완료 (digest: ${finalizeResult.digest})`);
-    final = await pollSnapshot(client, challengeId, (s) => s.challenge.status === STATUS.ENDED);
+    console.log('\n마지막 날 제출 완료');
+    final = await finalizeAndWait(client, packageId, challengeId, oracle);
   }
 
   printSummary(final);

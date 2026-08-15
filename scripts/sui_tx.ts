@@ -91,6 +91,9 @@ function sleep(ms: number): Promise<void> {
  * 확인함(create_challenge 성공 직후 join용 조회가 한 번 실패했다 재시도하니 됐다).
  * 풀노드의 읽기 경로가 쓰기를 즉시 못 따라가는 반영 지연으로 보인다. 그래서 짧게
  * 재시도한다 (총 ~6초, 데모 중 사람이 다음 명령을 치는 시간보다 짧다).
+ *
+ * 단, "오브젝트는 찾았는데 shared가 아니다"는 반영 지연이 아니라 잘못된 ID를 넘긴
+ * 것 같은 영구적 문제라 재시도할 이유가 없다 — 곧바로 던진다.
  */
 export async function sharedObjectRef(
   client: SuiGrpcClient,
@@ -104,8 +107,12 @@ export async function sharedObjectRef(
       const { objects } = await client.core.getObjects({ objectIds: [objectId] });
       const obj = objects[0];
       if (obj instanceof Error) throw obj;
-      if (!obj || obj.owner.$kind !== 'Shared') {
-        throw new Error(`${objectId}는 shared object가 아니다 (owner: ${obj?.owner.$kind ?? 'unknown'})`);
+      if (!obj) throw new Error(`${objectId} 오브젝트를 찾지 못했다`);
+      if (obj.owner.$kind !== 'Shared') {
+        // 영구적 문제(잘못된 ID) — 재시도해봤자 안 바뀐다
+        throw Object.assign(new Error(`${objectId}는 shared object가 아니다 (owner: ${obj.owner.$kind})`), {
+          permanent: true,
+        });
       }
       return {
         objectId,
@@ -113,26 +120,35 @@ export async function sharedObjectRef(
         mutable: true,
       };
     } catch (e) {
+      if ((e as { permanent?: boolean })?.permanent) throw e;
       lastError = e;
     }
   }
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
-/** sender 소유의 SUI 코인 중 minValue 이상인 것을 하나 골라 가스 지불 + 필요시 split 재료로 쓴다 */
+/**
+ * sender 소유의 SUI 코인 중 minValue 이상인 것을 하나 골라 가스 지불 + 필요시 split 재료로 쓴다.
+ * getCoins는 페이지네이션이 있다(기본 페이지당 ~50개) — 첫 페이지만 보면 조건을 만족하는
+ * 코인이 뒤 페이지에 있을 때 "잔고 충분한데 잔고 부족"으로 잘못 실패한다. read_state.ts의
+ * listParticipantFieldIds와 같은 패턴으로 hasNextPage가 끝날 때까지 돈다.
+ */
 async function selectGasCoin(
   client: SuiGrpcClient,
   owner: string,
   minValue: number,
 ): Promise<{ objectId: string; version: string; digest: string }> {
-  const { objects } = await client.core.getCoins({ address: owner, coinType: SUI_COIN_TYPE });
-  const coin = objects.find((o) => BigInt(o.balance) >= BigInt(minValue));
-  if (!coin) {
-    throw new Error(
-      `${owner} 소유의 SUI 코인 중 ${minValue} MIST 이상인 게 없다 — 잔고 부족 (진모에게 pay-sui 요청 필요할 수 있음)`,
-    );
+  let cursor: string | undefined;
+  for (;;) {
+    const res = await client.core.getCoins({ address: owner, coinType: SUI_COIN_TYPE, cursor });
+    const coin = res.objects.find((o) => BigInt(o.balance) >= BigInt(minValue));
+    if (coin) return { objectId: coin.id, version: coin.version, digest: coin.digest };
+    if (!res.hasNextPage) break;
+    cursor = res.cursor ?? undefined;
   }
-  return { objectId: coin.id, version: coin.version, digest: coin.digest };
+  throw new Error(
+    `${owner} 소유의 SUI 코인 중 ${minValue} MIST 이상인 게 없다 — 잔고 부족 (진모에게 pay-sui 요청 필요할 수 있음)`,
+  );
 }
 
 export interface TxOutcome {

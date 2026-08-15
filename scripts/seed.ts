@@ -27,7 +27,7 @@
  */
 
 import { readState, createSuiClient, humanizeError, mistToSui, shortAddress, STATUS } from './read_state';
-import { signAndExecute, loadOracleKeypair, MoveAbortError, GAS_BUDGET, sharedObjectRef } from './sui_tx';
+import { signAndExecute, loadOracleKeypair, MoveAbortError, GAS_BUDGET, sharedObjectRef, SUI_COIN_TYPE } from './sui_tx';
 import { Transaction } from '@mysten/sui/transactions';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -43,7 +43,6 @@ const ALPHA_BP = 2000;
 // 소액 테스트넷 자금이라 참가자당 소액으로 잡는다 (오라클 잔고 총 ~0.2 SUI 전제)
 const STAKE_A = 20_000_000; // 0.02 SUI
 const STAKE_BC = 20_000_000; // 0.02 SUI — B/C가 손으로 join할 때 쓸 금액(안내문에도 이 값을 찍는다)
-const SUI_COIN_TYPE = '0x2::sui::SUI';
 // B/C 잔고가 이 이상이어야 "충전됐다"고 판단한다 (stake + 가스 예산 여유분)
 const MIN_BC_BALANCE = STAKE_BC + GAS_BUDGET * 2;
 
@@ -64,6 +63,34 @@ function saveState(state: DemoState): void {
   writeFileSync(STATE_FILE, JSON.stringify(state, null, 2) + '\n', 'utf-8');
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * readState는 일시적 gRPC 오류(네트워크 blip, 풀노드 반영 지연)로도 던질 수 있다.
+ * 그걸 "저장된 방을 못 쓴다"로 오인해 곧장 새 방을 만들면 saveState가
+ * `.demo-state.json`을 덮어써 기존 방(과 거기 이미 join된 B/C의 stake)을
+ * 로컬에서 추적 불가능하게 잃어버린다 — 그래서 몇 번 재시도하고, 그래도 안
+ * 되면 "새로 만들지 않고" 그대로 던져서 사용자가 원인을 보게 한다.
+ */
+async function readStateWithRetry(
+  client: Parameters<typeof readState>[0],
+  challengeId: string,
+  attempts = 3,
+): Promise<Awaited<ReturnType<typeof readState>>> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (attempt > 0) await sleep(1000);
+    try {
+      return await readState(client, challengeId);
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
 async function main(): Promise<void> {
   await import('dotenv/config');
 
@@ -81,16 +108,15 @@ async function main(): Promise<void> {
   let challengeId: string | null = null;
   const existing = loadState();
   if (existing) {
-    try {
-      const c = await readState(client, existing.challengeId);
-      if (c.challenge.oracle === oracleAddress && c.challenge.status !== STATUS.ENDED) {
-        challengeId = existing.challengeId;
-        console.log(`기존 데모 방 재사용: ${challengeId} (상태: ${c.challenge.statusLabel})`);
-      } else {
-        console.log(`저장된 방(${existing.challengeId})은 재사용할 수 없다 (오라클 불일치 또는 ENDED) — 새로 만든다.`);
-      }
-    } catch (e) {
-      console.log(`저장된 방을 읽지 못했다 (${humanizeError(e)}) — 새로 만든다.`);
+    // 여기서 실패하면(재시도 후에도) 절대 "새로 만든다"로 넘어가지 않는다 — 그러면
+    // 아래 saveState가 기존 방 ID를 덮어써 되돌릴 수 없다. 일시적 오류인지 진짜
+    // 못 쓰는 방인지 구분이 안 되므로, 안전한 쪽(중단)으로 던진다.
+    const c = await readStateWithRetry(client, existing.challengeId);
+    if (c.challenge.oracle === oracleAddress && c.challenge.status !== STATUS.ENDED) {
+      challengeId = existing.challengeId;
+      console.log(`기존 데모 방 재사용: ${challengeId} (상태: ${c.challenge.statusLabel})`);
+    } else {
+      console.log(`저장된 방(${existing.challengeId})은 재사용할 수 없다 (오라클 불일치 또는 ENDED) — 새로 만든다.`);
     }
   }
 
