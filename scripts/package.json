@@ -9,6 +9,8 @@
   },
   "scripts": {
     "read-state": "tsx read_state.ts",
+    "seed": "tsx seed.ts",
+    "submit": "tsx submit.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
