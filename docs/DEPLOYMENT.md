@@ -77,6 +77,51 @@ Table ID      0xca4d8522d37c09d0e8f6ac5a98ee8673c8da2d408a9dacc80d531c3b1fd75f80
 
 ---
 
+## 방 ③ 데모용
+
+`scripts/seed.ts`(유안)로 만든 방. 대시보드(승준) 연동 대상이자, 오라클 스크립트가
+실제 테스트넷에서 5일 전체 시나리오를 도는지 확인한 첫 검증 사이클이기도 하다.
+
+| 항목 | 값 |
+|---|---|
+| 생성일 | 2026-08-15 |
+| 용도 | 승준의 대시보드 연동 대상, `seed.ts`/`submit.ts` 실측 검증 |
+| 파라미터 | `total_days = 5`, `alpha_bp = 2000` (α=0.2, D-06·D-14) |
+| 예치 | 3인 × 0.02 SUI = vault 0.06 SUI |
+| 상태 | **ENDED** — day1 B탈락 / day3 C탈락 / A완주 시나리오로 5일 + finalize까지 완주시킨 결과다. |
+
+```
+Challenge ID (shared object)
+0x2f6f1b3230edaee98446d931dfb757c4a9f0ff97a14f232ea09877cb79447424
+
+참가자 Table ID
+0x67d6158137dc2878fce0160620b39bc3cc37d99af2323197a65f25fbf9cc671e
+```
+
+참가자 3인:
+
+| 별칭 | 주소 | 비고 |
+|---|---|---|
+| `yuan-oracle` | `0xb222c9e1592675d4666ea416c5d7b4acf272ed01ac23dc7248bd76fa2b3f1041` | 오라클 = 방 생성자 (A, 완주) |
+| `demo-b` | `0x2a024743f3e3bc4cc1ab2b683531c54448dcd7ce124eecb0fed103dca7d56a11` | B, day1 탈락 |
+| `demo-c` | `0x8dcb2df7fc5cfa04338116567ba6d18e85bffdb3fc7f403565e540e3bc5a1524` | C, day3 탈락 |
+
+> `demo-b`/`demo-c`의 키는 유안의 로컬 키스토어에만 있다 (D-24와 같은 이유로 고정 주소 재사용 전제).
+
+**실측 결과** (`npm run read-state -- 0x2f6f1b32...`, 참고용 — 보존 법칙 검산 완료, dust=0):
+
+| 참가자 | stake (MIST) | failed_day | claimable (MIST) |
+|---|---|---|---|
+| A (`yuan-oracle`) | 20,000,000 | 0 (완주) | 51,840,000 |
+| B (`demo-b`) | 20,000,000 | 1 | 0 |
+| C (`demo-c`) | 20,000,000 | 3 | 8,160,000 |
+| 합계 | 60,000,000 | | 60,000,000 |
+
+ENDED 상태라 참가자별 탈락일·claimable이 이미 다 채워져 있다 — 대시보드 개발 시 빈 PENDING 방보다
+이쪽이 실제로 보여줄 값이 있어 더 유용할 것이다. 새 방이 필요하면 유안에게 `npm run seed` 재실행 요청.
+
+---
+
 ## 발표용 방
 
 아직 만들지 않았다. 리허설이 끝난 뒤 **발표 당일 직전에 새로 판다** (D-18: 사전 세팅).
@@ -153,3 +198,4 @@ Your package is already published. You have to manually remove the publication e
 |---|---|---|---|
 | 2026-08-09 | `0xfb1eb049…` | 최초 생성 | 참가자 0명 · **사용 금지** |
 | 2026-08-10 | `0xcc48adc4…` | 검증 / 리허설 | 3인 참여 · PENDING |
+| 2026-08-15 | `0x2f6f1b32…` | 데모용(대시보드 연동 + 오라클 스크립트 실측 검증) | 3인 참여 · ENDED |

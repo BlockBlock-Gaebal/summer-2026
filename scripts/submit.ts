@@ -11,10 +11,13 @@
  * PARTICIPANT_B_ADDRESS / PARTICIPANT_C_ADDRESS에서 읽는다.
  *
  * ⚠️ 안전장치: 그날의 예정 탈락자가 아직 join 안 했거나 주소가 안 적혀 있으면
- * (예: 유안이 아직 B/C를 손으로 join 안 시킨 상태에서 먼저 이 스크립트를 시험해볼 때)
- * 그날은 조용히 "아무도 탈락 안 함"으로 대체해 진행한다. 무효한 주소를 그대로
- * 넘기면 컨트랙트가 ENotParticipant로 abort하기 때문이다 — 데모 리허설 중
- * 원인 불명 abort보다 "오늘은 탈락자 없음"으로 넘어가는 쪽이 안전하다 (D-16 취지).
+ * **submit_results를 아예 호출하지 않고 throw한다.** (진모 리뷰 지적, 08-15)
+ * 처음엔 "조용히 빈 명단으로 진행"했는데, 이게 거꾸로 더 위험하다 — abort는
+ * 아무 일도 안 일어나서 재시도가 공짜지만, submit_results가 성공하면
+ * current_day가 +1 되고 되돌릴 방법이 없다. SCHEDULE은 절대 day 번호
+ * 기준이라, B가 join 안 된 채로 실수로 한 번 돌리면 day1이 그냥 소모되고
+ * B는 시나리오상 영영 탈락시킬 수 없다 (5일짜리 방을 새로 파야 함).
+ * 그래서 명단이 스케줄과 안 맞으면 무조건 멈추고, 사람이 확인 후 재실행하게 한다.
  *
  * total_days만큼 다 제출되면(day == total_days) 이어서 자동으로 finalize()도
  * 호출해 ENDED로 마무리한다. finalize는 오라클 제한이 없는 함수라 아무 서명으로나
@@ -132,18 +135,27 @@ async function main(): Promise<void> {
 
   if (role) {
     const addr = process.env[`PARTICIPANT_${role}_ADDRESS`];
-    const participant = addr ? before.participants.find((p) => p.address === addr) : undefined;
-    if (participant && participant.failedDay === 0n) {
-      failed = [addr!];
-      console.log(`day ${nextDay}: 예정대로 ${role}(${shortAddress(addr!)}) 탈락 제출`);
-    } else {
-      const reason = !addr
-        ? `PARTICIPANT_${role}_ADDRESS가 없다`
-        : !participant
-          ? `${shortAddress(addr)}가 아직 참여자가 아니다`
-          : `${shortAddress(addr)}는 이미 day${participant.failedDay}에 탈락 처리됨`;
-      console.log(`day ${nextDay}: ${role} 탈락이 예정돼 있으나 ${reason} — 오늘은 탈락자 없이 진행`);
+    if (!addr) {
+      throw new Error(
+        `day ${nextDay}: ${role} 탈락이 예정돼 있으나 PARTICIPANT_${role}_ADDRESS가 .env에 없다 — ` +
+          `채우고 다시 실행할 것. (여기서 빈 명단으로 넘어가면 day를 되돌릴 수 없이 날린다)`,
+      );
     }
+    const participant = before.participants.find((p) => p.address === addr);
+    if (!participant) {
+      throw new Error(
+        `day ${nextDay}: ${role}(${shortAddress(addr)})가 아직 이 방에 join하지 않았다 — ` +
+          `먼저 join시키고 다시 실행할 것.`,
+      );
+    }
+    if (participant.failedDay !== 0n) {
+      throw new Error(
+        `day ${nextDay}: ${role}(${shortAddress(addr)})는 이미 day${participant.failedDay}에 탈락 처리돼 있다 — ` +
+          `SCHEDULE 설정을 확인할 것.`,
+      );
+    }
+    failed = [addr];
+    console.log(`day ${nextDay}: 예정대로 ${role}(${shortAddress(addr)}) 탈락 제출`);
   } else {
     console.log(`day ${nextDay}: 예정된 탈락자 없음 — 빈 명단으로 진행`);
   }
