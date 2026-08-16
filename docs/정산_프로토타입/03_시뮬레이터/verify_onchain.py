@@ -4,6 +4,9 @@ mirror.py는 challenge.move의 파이썬 미러(연산 순서·절단 시점 1:1
 미러를 정답지로 놓고 실제 배포된 방의 claim 결과를 대조한다.
 방이 바뀌면 아래 "시나리오 / 온체인 실측값" 블록만 고치면 된다.
 
+ACTUAL = None 으로 두면 대조 없이 미러 기대값만 출력한다 (리허설 전 "이 값이
+나와야 한다"를 미리 확인하는 용도). 이 모드는 항상 exit 0.
+
 사용: python3 verify_onchain.py   (전부 일치 0, 하나라도 불일치 1)
 """
 import sys
@@ -19,6 +22,7 @@ FAIL_SCHEDULE = {1: ["B"], 3: ["C"]}    # day -> 그날 탈락자 (A는 완주)
 
 # ─── 온체인 실측값 (방 ③) ──────────────────────────────────────
 # 참가자별 claimable (ENDED 상태에서 읽은 값)
+# 아직 안 돌린 방이면 통째로 None → 미러 기대값만 출력하고 종료(ACTUAL_VAULT는 무시).
 ACTUAL = {
     "A": 51_840_000,
     "B": 0,
@@ -65,6 +69,27 @@ def run_mirror():
 
 mirror, mirror_dust = run_mirror()
 deposit = STAKE * len(PARTICIPANTS)
+
+print(f"=== 방 파라미터: D={D}, alpha_bp={ALPHA_BP}, "
+      f"stake={STAKE:,} x {len(PARTICIPANTS)}인, 탈락={FAIL_SCHEDULE} ===")
+
+if ACTUAL is None:
+    # 대조할 실측값이 없다 → 미러가 뭘 예측하는지만 보여주고 끝낸다.
+    # 대조가 아니므로 OK/FAIL 판정도, 종료코드 1도 없다.
+    print("\n--- 미러 기대값 (대조 없음) ---")
+    for who in PARTICIPANTS:
+        print(f"       {who:<22} {mirror[who]:>15,}")
+    print(f"       {'dust':<22} {mirror_dust:>15,}")
+    print(f"       {'-'*38}")
+    total = sum(mirror.values()) + mirror_dust
+    print(f"       {'합계(claim+dust)':<22} {total:>15,}")
+    # 미러 내부 보존 법칙: ∑claimable + dust == ∑예치액. 깨지면 미러 자체가 버그다.
+    # 대조가 아니라 참고 표시라 종료코드는 건드리지 않는다 (run.py가 본 검증).
+    print(f"       {'예치총합':<22} {deposit:>15,}"
+          f"  {'← 보존 법칙 OK' if total == deposit else '← 보존 법칙 깨짐(미러 버그)'}")
+    print("\n실측값 미입력 — 미러 기대값만 표시함")
+    sys.exit(0)
+
 claim_sum = sum(ACTUAL.values())
 
 if ACTUAL_VAULT is None:
@@ -73,9 +98,6 @@ if ACTUAL_VAULT is None:
     actual_dust = deposit - claim_sum
 else:
     actual_dust = ACTUAL_VAULT - claim_sum      # 독립 측정값으로 계산
-
-print(f"=== 방 파라미터: D={D}, alpha_bp={ALPHA_BP}, "
-      f"stake={STAKE:,} x {len(PARTICIPANTS)}인, 탈락={FAIL_SCHEDULE} ===")
 
 print("\n--- [1] 온체인 보존 법칙: claimable 합계 + dust == vault ---")
 if ACTUAL_VAULT is None:
