@@ -19,3 +19,4 @@ dist/
 # --- 데모 스크립트 로컬 상태 ---
 # seed.ts가 만든 유안 소유 데모 방 ID. 팀 공용 값이 아니라 재실행용 로컬 캐시라 커밋 안 함
 scripts/.demo-state.json
+.venv/
