@@ -13,7 +13,7 @@ import {
   CHALLENGE_ID,
   POLL_INTERVAL,
 } from './config';
-
+import RefundCurve from './RefundCurve';
 
 const client = createSuiClient({
   network: NETWORK,
@@ -23,18 +23,22 @@ const client = createSuiClient({
 export default function App() {
   const [snap, setSnap] = useState<ChallengeSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lastOk, setLastOk] = useState<Date | null>(null);
+  const [failCount, setFailCount] = useState(0);
 
   useEffect(() => {
     const loadState = async () => {
       try {
         const nextSnap = await readState(client, CHALLENGE_ID);
+
         setSnap(nextSnap);
         setError(null);
-
-        console.log('상태 갱신:', nextSnap);
+        setLastOk(new Date());
+        setFailCount(0);
       } catch (e) {
         console.error(e);
         setError(String(e));
+        setFailCount((count) => count + 1);
       }
     };
 
@@ -60,6 +64,20 @@ export default function App() {
 
   return (
     <div style={{ padding: 24, fontFamily: 'sans-serif' }}>
+      {failCount >= 2 && (
+  <div
+    style={{
+      marginBottom: 16,
+      padding: '12px 16px',
+      background: '#fff3cd',
+      border: '1px solid #ffe69c',
+      borderRadius: 8,
+      color: '#664d03',
+    }}
+  >
+    ⚠ 체인 연결 끊김 — 아래 값은 이전 상태입니다.
+  </div>
+)}
       <h1>갓생 내기</h1>
 
       <p>
@@ -69,6 +87,10 @@ export default function App() {
         {' · '}
         vault {mistToSui(c.vault)} SUI
       </p>
+      <RefundCurve
+       challenge={c}
+       participants={participants}
+      />
 
       <table cellPadding={8}>
         <thead>
@@ -151,6 +173,11 @@ export default function App() {
 
       <p style={{ marginTop: 20, fontSize: 12 }}>
         5초마다 Sui Testnet 상태를 자동으로 갱신합니다.
+        {' · '}
+        마지막 갱신{' '}
+        {lastOk
+         ? lastOk.toLocaleTimeString('ko-KR')
+         : '확인 중'}
       </p>
     </div>
   );
