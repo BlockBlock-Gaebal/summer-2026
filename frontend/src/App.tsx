@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import {
   createSuiClient,
   readState,
-  mistToSui,
   shortAddress,
   type ChallengeSnapshot,
 } from './read_state';
 import { calcRefund, refundRate } from './curve';
+import RefundCurve from './RefundCurve';
 import {
   NETWORK,
   GRPC_URL,
@@ -14,144 +14,371 @@ import {
   POLL_INTERVAL,
 } from './config';
 
+import './App.css';
 
 const client = createSuiClient({
   network: NETWORK,
   url: GRPC_URL,
 });
 
+const MIST_PER_SUI = 1_000_000_000n;
+
+function formatSui(value: bigint, decimals = 5) {
+  const whole = value / MIST_PER_SUI;
+  const fraction = (value % MIST_PER_SUI)
+    .toString()
+    .padStart(9, '0')
+    .slice(0, decimals);
+
+  return `${whole}.${fraction}`;
+}
+
 export default function App() {
   const [snap, setSnap] = useState<ChallengeSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [lastOk, setLastOk] = useState<Date | null>(null);
+  const [failCount, setFailCount] = useState(0);
 
   useEffect(() => {
     const loadState = async () => {
       try {
         const nextSnap = await readState(client, CHALLENGE_ID);
+
         setSnap(nextSnap);
         setError(null);
-
-        console.log('상태 갱신:', nextSnap);
+        setLastOk(new Date());
+        setFailCount(0);
       } catch (e) {
         console.error(e);
         setError(String(e));
+        setFailCount((count) => count + 1);
       }
     };
 
-    // 처음 페이지를 열었을 때 즉시 한 번 조회
     loadState();
 
-    // 이후 5초마다 다시 조회
     const interval = setInterval(loadState, POLL_INTERVAL);
 
-    // 컴포넌트가 사라질 때 polling 종료
     return () => clearInterval(interval);
   }, []);
 
   if (error && !snap) {
-    return <pre>에러: {error}</pre>;
+    return (
+      <main className="app-shell">
+        <div className="error-screen">
+          <strong>체인 데이터를 불러오지 못했습니다.</strong>
+          <span>{error}</span>
+        </div>
+      </main>
+    );
   }
 
   if (!snap) {
-    return <p>불러오는 중...</p>;
+    return (
+      <main className="app-shell">
+        <div className="loading-screen">
+          Sui Testnet에서 Challenge를 불러오는 중...
+        </div>
+      </main>
+    );
   }
 
-  const { challenge: c, participants } = snap;
+  const { challenge: c, participants, warnings } = snap;
+
+  const progress =
+    c.totalDays === 0n
+      ? 0
+      : Math.min(
+          100,
+          (Number(c.currentDay) / Number(c.totalDays)) * 100,
+        );
 
   return (
-    <div style={{ padding: 24, fontFamily: 'sans-serif' }}>
-      <h1>갓생 내기</h1>
+    <main className="app-shell">
 
-      <p>
-        {c.statusLabel}
-        {' · '}
-        day {String(c.currentDay)} / {String(c.totalDays)}
-        {' · '}
-        vault {mistToSui(c.vault)} SUI
-      </p>
+      {/* 연결 실패 */}
+      {failCount >= 2 && (
+        <div className="connection-warning">
+          <strong>⚠ 체인 연결 끊김</strong>
+          <span>아래 값은 마지막 정상 조회 시점의 데이터입니다.</span>
+        </div>
+      )}
 
-      <table cellPadding={8}>
-        <thead>
-          <tr>
-             <th align="left">주소</th>
-             <th align="right">예치금</th>
-             <th align="right">탈락일</th>
-             <th align="right">환급률</th>
-             <th align="right">환급 원금</th>
-             <th align="right">claimable</th>
-             <th align="left">상태</th>
-          </tr>
-        </thead>
+      {/* read_state warnings */}
+      {warnings.length > 0 && (
+        <div className="data-warning">
+          {warnings.map((warning) => (
+            <div key={warning}>⚠ {warning}</div>
+          ))}
+        </div>
+      )}
 
-        <tbody>
-  {participants.map((p) => {
-    const failed = p.failedDay !== 0n;
+      {/* Header */}
+      <header className="dashboard-header">
+        <div>
+          <div className="eyebrow">
+            BLOCKBLOCK · SUI TESTNET
+          </div>
 
-    const refund = failed
-      ? calcRefund(
-          p.stake,
-          p.failedDay,
-          c.totalDays,
-          c.alphaBp,
-        )
-      : null;
+          <h1>갓생 내기</h1>
 
-    const rate = failed
-      ? refundRate(
-          p.failedDay,
-          c.totalDays,
-          c.alphaBp,
-        )
-      : null;
+          <p>
+            Time-Weighted Commitment Challenge
+          </p>
+        </div>
 
-    return (
-      <tr key={p.address}>
-        <td>
-          <code>{shortAddress(p.address)}</code>
-        </td>
+        <div
+          className={
+            failCount >= 2
+              ? 'network-badge network-error'
+              : 'network-badge'
+          }
+        >
+          <span className="network-dot" />
 
-        <td align="right">
-          {mistToSui(p.stake)} SUI
-        </td>
+          {failCount >= 2
+            ? 'CONNECTION LOST'
+            : 'LIVE'}
+        </div>
+      </header>
 
-        <td align="right">
-          {failed
-            ? `Day ${String(p.failedDay)}`
-            : '—'}
-        </td>
+      {/* Stats */}
+      <section className="stats-grid">
 
-        <td align="right">
-          {rate === null
-            ? '—'
-            : `${(rate * 100).toFixed(1)}%`}
-        </td>
+        <article className="stat-card">
+          <span className="stat-label">
+            STATUS
+          </span>
 
-        <td align="right">
-          {refund === null
-            ? '—'
-            : `${mistToSui(refund)} SUI`}
-        </td>
+          <strong className={`challenge-status status-${c.statusLabel.toLowerCase()}`}>
+            {c.statusLabel}
+          </strong>
+        </article>
 
-        <td align="right">
-          {mistToSui(p.claimable)} SUI
-        </td>
+        <article className="stat-card">
+          <span className="stat-label">
+            CURRENT DAY
+          </span>
 
-        <td>
-          {!failed
-            ? '생존'
-            : p.failedDay === 1n
-              ? '전액 몰수'
-              : `Day ${String(p.failedDay)} 탈락`}
-        </td>
-      </tr>
-    );
-  })}
-</tbody>
-      </table>
+          <strong>
+            {String(c.currentDay)}
+            <span className="stat-sub">
+              {' '} / {String(c.totalDays)}
+            </span>
+          </strong>
+        </article>
 
-      <p style={{ marginTop: 20, fontSize: 12 }}>
-        5초마다 Sui Testnet 상태를 자동으로 갱신합니다.
-      </p>
-    </div>
+        <article className="stat-card">
+          <span className="stat-label">
+            TOTAL VAULT
+          </span>
+
+          <strong>
+            {formatSui(c.vault, 4)}
+            <span className="stat-sub"> SUI</span>
+          </strong>
+        </article>
+
+        <article className="stat-card">
+          <span className="stat-label">
+            PARTICIPANTS
+          </span>
+
+          <strong>{participants.length}</strong>
+        </article>
+
+      </section>
+
+      {/* Progress */}
+      <section className="progress-card">
+
+        <div className="section-header">
+          <div>
+            <span className="section-eyebrow">
+              CHALLENGE PROGRESS
+            </span>
+
+            <strong>
+              Day {String(c.currentDay)} of {String(c.totalDays)}
+            </strong>
+          </div>
+
+          <strong>{progress.toFixed(0)}%</strong>
+        </div>
+
+        <div className="progress-track">
+          <div
+            className="progress-fill"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+
+      </section>
+
+      {/* Curve */}
+      <section className="dashboard-card curve-card">
+        <RefundCurve
+          challenge={c}
+          participants={participants}
+        />
+      </section>
+
+      {/* Participant Table */}
+      <section className="dashboard-card">
+
+        <div className="table-title">
+          <div>
+            <span className="section-eyebrow">
+              PARTICIPANTS
+            </span>
+
+            <h2>참가자 현황</h2>
+          </div>
+
+          <span>
+            {participants.length} participants
+          </span>
+        </div>
+
+        <div className="table-wrapper">
+          <table className="participant-table">
+
+            <thead>
+              <tr>
+                <th>참가자</th>
+                <th>주소</th>
+                <th>예치금</th>
+                <th>탈락일</th>
+                <th>환급률</th>
+                <th>환급 원금</th>
+                <th>Claimable</th>
+                <th>상태</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {participants.map((p, index) => {
+                const failed = p.failedDay !== 0n;
+
+                const refund = failed
+                  ? calcRefund(
+                      p.stake,
+                      p.failedDay,
+                      c.totalDays,
+                      c.alphaBp,
+                    )
+                  : null;
+
+                const rate = failed
+                  ? refundRate(
+                      p.failedDay,
+                      c.totalDays,
+                      c.alphaBp,
+                    )
+                  : null;
+
+                let statusLabel = '생존';
+                let statusClass = 'alive';
+
+                if (!failed && c.statusLabel === 'ENDED') {
+                  statusLabel = '완주';
+                  statusClass = 'completed';
+                }
+
+                if (failed) {
+                  if (refund === 0n) {
+                    statusLabel = '전액 몰수';
+                    statusClass = 'slashed';
+                  } else {
+                    statusLabel = `Day ${String(p.failedDay)} 탈락`;
+                    statusClass = 'failed';
+                  }
+                }
+
+                return (
+                  <tr key={p.address}>
+
+                    <td>
+                      <span className="participant-name">
+                        {String.fromCharCode(65 + index)}
+                      </span>
+                    </td>
+
+                    <td>
+                      <code className="address">
+                        {shortAddress(p.address)}
+                      </code>
+                    </td>
+
+                    <td>
+                      {formatSui(p.stake, 4)} SUI
+                    </td>
+
+                    <td>
+                      {failed
+                        ? `Day ${String(p.failedDay)}`
+                        : '—'}
+                    </td>
+
+                    <td>
+                      {rate === null
+                        ? '—'
+                        : `${(rate * 100).toFixed(1)}%`}
+                    </td>
+
+                    <td>
+                      {refund === null
+                        ? '—'
+                        : `${formatSui(refund, 5)} SUI`}
+                    </td>
+
+                    <td className="claimable">
+                      {formatSui(p.claimable, 5)} SUI
+                    </td>
+
+                    <td>
+                      <span className={`status-badge ${statusClass}`}>
+                        {statusLabel}
+                      </span>
+                    </td>
+
+                  </tr>
+                );
+              })}
+            </tbody>
+
+          </table>
+        </div>
+
+      </section>
+
+      {/* Footer */}
+      <footer className="dashboard-footer">
+
+        <div>
+          <span
+            className={
+              failCount >= 2
+                ? 'connection-dot disconnected'
+                : 'connection-dot'
+            }
+          />
+
+          {failCount >= 2
+            ? 'Disconnected'
+            : 'Connected to Sui Testnet'}
+        </div>
+
+        <div>
+          마지막 갱신{' '}
+          {lastOk
+            ? lastOk.toLocaleTimeString('ko-KR')
+            : '확인 중'}
+        </div>
+
+      </footer>
+
+    </main>
   );
 }
