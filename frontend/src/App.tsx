@@ -122,10 +122,10 @@ export default function App() {
             BLOCKBLOCK · SUI TESTNET
           </div>
 
-          <h1>갓생 내기</h1>
+          <h1>Locked In (갓생 내기)</h1>
 
           <p>
-            Time-Weighted Commitment Challenge
+            Locked in. Paid out.
           </p>
         </div>
 
@@ -391,25 +391,33 @@ export default function App() {
       {/* Footer */}
       <footer className="dashboard-footer">
 
-        <div>
-          <span
-            className={
-              failCount >= 2
-                ? 'connection-dot disconnected'
-                : 'connection-dot'
-            }
-          />
+        <div className="footer-row">
 
-          {failCount >= 2
-            ? 'Disconnected'
-            : 'Connected to Sui Testnet'}
+          <div>
+            <span
+              className={
+                failCount >= 2
+                  ? 'connection-dot disconnected'
+                  : 'connection-dot'
+              }
+            />
+
+            {failCount >= 2
+              ? 'Disconnected'
+              : 'Connected to Sui Testnet'}
+          </div>
+
+          <div>
+            마지막 갱신{' '}
+            {lastOk
+              ? lastOk.toLocaleTimeString('ko-KR')
+              : '확인 중'}
+          </div>
+
         </div>
 
-        <div>
-          마지막 갱신{' '}
-          {lastOk
-            ? lastOk.toLocaleTimeString('ko-KR')
-            : '확인 중'}
+        <div className="footer-meme">
+          discipline PvP for unemployed gambling addicts
         </div>
 
       </footer>
