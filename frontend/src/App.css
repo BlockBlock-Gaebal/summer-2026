@@ -294,6 +294,18 @@
   font-weight: 650;
 }
 
+/* 미실현 배당 — 아직 claimable이 아니므로 확정값(.claimable)보다 약하게 준다.
+   생존 중인 참가자를 색으로 구분해주는 것이 이 칼럼의 목적이다 */
+.pending-dividend {
+  font-weight: 600;
+  color: #2563eb;
+}
+
+/* "—" / "정산 완료" 처럼 금액이 아닌 칸. 숫자와 같은 무게로 읽히면 안 된다 */
+.cell-muted {
+  color: #8a93a5;
+}
+
 /* Status */
 
 .status-badge {

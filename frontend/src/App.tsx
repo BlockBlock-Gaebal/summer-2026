@@ -6,6 +6,7 @@ import {
   type ChallengeSnapshot,
 } from './read_state';
 import { calcRefund, refundRate } from './curve';
+import { pendingDividendView } from './dividend';
 import RefundCurve from './RefundCurve';
 import {
   NETWORK,
@@ -252,6 +253,9 @@ export default function App() {
                 <th>탈락일</th>
                 <th>환급률</th>
                 <th>환급 원금</th>
+                <th title="아직 claimable에 적립되지 않은 생존 배당. 탈락·종료 시점에 claimable로 합쳐진다">
+                  미실현 배당
+                </th>
                 <th>Claimable</th>
                 <th>상태</th>
               </tr>
@@ -277,6 +281,16 @@ export default function App() {
                       c.alphaBp,
                     )
                   : null;
+
+                // 진행 중 생존자의 claimable은 계속 0이다 (적립이 탈락·finalize
+                // 시점에 몰려 있다). 그 구간을 화면에서 메우는 값
+                const dividend = pendingDividendView(
+                  p.stake,
+                  p.accEntry,
+                  p.failedDay,
+                  c.accPerShare,
+                  c.statusLabel,
+                );
 
                 let statusLabel = '생존';
                 let statusClass = 'alive';
@@ -331,6 +345,27 @@ export default function App() {
                       {refund === null
                         ? '—'
                         : `${formatSui(refund, 5)} SUI`}
+                    </td>
+
+                    <td>
+                      {dividend.kind === 'accruing' ? (
+                        <span className="pending-dividend">
+                          {formatSui(dividend.amount, 5)} SUI
+                        </span>
+                      ) : (
+                        <span
+                          className="cell-muted"
+                          title={
+                            dividend.kind === 'settledAtEnd'
+                              ? '종료 시 claimable에 합산됨'
+                              : '탈락 당일 확정되어 claimable에 포함됨'
+                          }
+                        >
+                          {dividend.kind === 'settledAtEnd'
+                            ? '정산 완료'
+                            : '—'}
+                        </span>
+                      )}
                     </td>
 
                     <td className="claimable">
