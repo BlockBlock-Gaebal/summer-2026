@@ -1,4 +1,13 @@
-# scripts — 오라클 / 데모 자동화
+# Locked In — scripts (오라클 / 데모 자동화)
+
+> **Locked In** — *Locked in. Paid out.*
+> 한글 병기 **갓생 내기**. 기술 부제는 **시간가중 차등 몰수 습관 챌린지 프로토콜**.
+>
+> 이름이 바뀐 것은 프로젝트 명칭뿐이다.
+> **패키지 식별자는 `godsaeng`으로 남아 있다. 배포본과 묶여 있어 변경하지 않는다**
+> (Move 패키지 `godsaeng`, 모듈 `challenge`, npm 패키지 `godsaeng-scripts` — D-15 인터페이스 프리즈 / D-27 재배포 없음).
+>
+> 명칭 체계의 정본은 `docs/DECISIONS.md` D-30이다. 이 블록은 그 사본이며, 어긋나면 그쪽이 맞다.
 
 **담당: 유안 (C)** / 마감: 8/17
 (단 `read_state.ts`는 공용 조회 모듈이라 진모가 작성 — D-21)
