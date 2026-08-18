@@ -228,7 +228,7 @@ export default function App() {
 
   return (
     <div style={{ padding: 24, fontFamily: 'sans-serif' }}>
-      <h1>Locked In (갓생 내기)</h1>
+      <h1>LOCKED IN</h1>
       <p>
         {c.statusLabel} · day {String(c.currentDay)} / {String(c.totalDays)} ·
         vault {mistToSui(c.vault)} SUI
@@ -264,7 +264,7 @@ export default function App() {
 **성공하면 이렇게 보인다**
 
 ```
-Locked In (갓생 내기)
+LOCKED IN
 PENDING · day 0 / 5 · vault 0.3000 SUI
 
 주소            예치금       탈락일   claimable    상태

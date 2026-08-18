@@ -1,36 +1,109 @@
 .app-shell {
   width: min(1180px, calc(100% - 48px));
   margin: 0 auto;
-  padding: 48px 0 36px;
+  padding: 40px 0 48px;
+}
+
+/* 브루탈리즘 공통 — 두꺼운 검정 테두리 + 블러 0 하드 섀도우.
+   모서리는 깎지 않는다 (radius 0) */
+
+.stat-card,
+.progress-card,
+.dashboard-card,
+.loading-screen,
+.error-screen,
+.connection-warning,
+.data-warning {
+  background: var(--paper);
+  border: var(--border);
+  border-radius: 0;
+  box-shadow: var(--hard-shadow);
 }
 
 /* Header */
 
 .dashboard-header {
+  margin-bottom: 32px;
+}
+
+.header-top {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 24px;
-  margin-bottom: 32px;
+  align-items: center;
+  gap: 16px;
+
+  margin-bottom: 8px;
 }
 
 .eyebrow,
 .section-eyebrow {
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  color: #7b8497;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
 }
 
+/* 제목 + 밈 이미지가 한 행을 나눠 쓴다.
+   왼쪽은 글자, 오른쪽은 그림 */
+.header-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 28px;
+}
+
+.header-copy {
+  min-width: 0;
+}
+
+/* 제목은 이 화면에서 가장 큰 덩어리다. 왼쪽 칸을 꽉 채운다 */
 .dashboard-header h1 {
-  margin: 8px 0 4px;
-  font-size: 40px;
+  margin: 0;
+
+  font-size: clamp(44px, 9vw, 112px);
+  font-weight: 900;
   letter-spacing: -0.04em;
+  line-height: 0.92;
+  text-transform: uppercase;
 }
 
-.dashboard-header p {
-  margin: 0;
-  color: #7b8497;
+/* 밈 부제 — 푸터에서 헤더로 올라왔다. 제목 다음으로 눈에 들어와야 한다 */
+.header-sub {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+
+  margin: 18px 0 0;
+
+  font-size: clamp(17px, 1.9vw, 24px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+/* 밈 이미지도 카드와 같은 대접 — 두꺼운 검정 테두리 + 하드 섀도우 */
+.header-art,
+.header-meme {
+  display: block;
+
+  height: auto;
+
+  border: var(--border);
+  border-radius: 0;
+  box-shadow: var(--hard-shadow);
+}
+
+.header-art {
+  width: clamp(220px, 30vw, 380px);
+}
+
+/* 원본이 220px밖에 안 되므로 그보다 키우지 않는다 (뭉개진다) */
+.header-meme {
+  width: 132px;
+
+  box-shadow: 3px 3px 0 var(--ink);
 }
 
 .network-badge {
@@ -38,26 +111,49 @@
   align-items: center;
   gap: 8px;
 
-  padding: 8px 12px;
+  padding: 7px 12px;
 
-  border: 1px solid #d8dde7;
-  border-radius: 999px;
+  background: var(--green);
+  border: var(--border);
+  border-radius: 0;
+  box-shadow: 3px 3px 0 var(--ink);
 
-  font-size: 11px;
-  font-weight: 700;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
 }
 
-.network-dot,
+.network-badge.network-error {
+  background: var(--red);
+  color: var(--paper);
+}
+
+.network-dot {
+  width: 10px;
+  height: 10px;
+
+  border: 2px solid var(--ink);
+  border-radius: 0;
+
+  background: var(--ink);
+}
+
+.network-error .network-dot {
+  background: var(--paper);
+  border-color: var(--paper);
+}
+
 .connection-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #16a34a;
+  width: 10px;
+  height: 10px;
+
+  border: 2px solid var(--ink);
+  background: var(--green);
 }
 
-.network-error .network-dot,
 .connection-dot.disconnected {
-  background: #dc2626;
+  background: var(--red);
 }
 
 /* Warning */
@@ -70,19 +166,17 @@
   margin-bottom: 20px;
   padding: 14px 16px;
 
-  border-radius: 10px;
+  font-weight: 700;
 }
 
 .connection-warning {
-  background: #fff7df;
-  border: 1px solid #efd88a;
-  color: #735c13;
+  background: var(--yellow);
+  color: var(--ink);
 }
 
 .data-warning {
-  background: #fff1f1;
-  border: 1px solid #efcaca;
-  color: #991b1b;
+  background: var(--red);
+  color: var(--paper);
 }
 
 /* Stats */
@@ -90,64 +184,74 @@
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  gap: 16px;
 
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 
 .stat-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 
   padding: 20px;
-
-  background: #ffffff;
-  border: 1px solid #e1e5ed;
-  border-radius: 12px;
 }
 
 .stat-label {
   font-size: 11px;
-  letter-spacing: 0.08em;
-  color: #8991a3;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
 }
 
+/* 이 화면의 주인공은 숫자다. 장식보다 크게 */
 .stat-card strong {
-  font-size: 24px;
+  font-size: 38px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1;
 }
 
 .stat-sub {
-  font-size: 14px;
-  font-weight: 500;
-  color: #8a93a5;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--ink);
 }
 
+/* PENDING / ACTIVE / ENDED — 글자색이 아니라 원색 블록으로 */
 .challenge-status {
-  font-size: 18px !important;
+  align-self: flex-start;
+
+  padding: 6px 12px;
+
+  border: var(--border);
+
+  font-size: 24px !important;
+  letter-spacing: -0.02em;
 }
 
 .status-pending {
-  color: #b7791f;
+  background: var(--yellow);
+  color: var(--ink);
 }
 
 .status-active {
-  color: #1677ff;
+  background: var(--blue);
+  color: var(--paper);
 }
 
 .status-ended {
-  color: #16a34a;
+  background: var(--green);
+  color: var(--ink);
 }
 
 /* Progress */
 
 .progress-card {
-  margin-bottom: 16px;
+  margin-bottom: 24px;
   padding: 20px;
-
-  background: #ffffff;
-  border: 1px solid #e1e5ed;
-  border-radius: 12px;
 }
 
 .section-header {
@@ -161,23 +265,31 @@
 .section-header > div {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
 }
 
+.section-header strong {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+/* 진행률 바 — 검정 테두리 안에 꽉 찬 검정 블록. 그라데이션 없음 */
 .progress-track {
-  height: 7px;
+  height: 26px;
 
   overflow: hidden;
 
-  background: #edf0f5;
-  border-radius: 999px;
+  background: var(--paper);
+  border: var(--border);
+  border-radius: 0;
 }
 
 .progress-fill {
   height: 100%;
 
-  background: #111827;
-  border-radius: inherit;
+  background: var(--ink);
+  border-radius: 0;
 
   transition: width 0.35s ease;
 }
@@ -185,19 +297,34 @@
 /* General Card */
 
 .dashboard-card {
-  margin-bottom: 16px;
+  margin-bottom: 24px;
   padding: 24px;
-
-  background: #ffffff;
-  border: 1px solid #e1e5ed;
-  border-radius: 12px;
 }
 
-.curve-card section {
-  margin: 0 !important;
+/* Curve */
+
+.curve-panel h2 {
+  margin: 0;
+
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
 }
 
-.curve-card svg {
+.curve-caption {
+  margin: 8px 0 0;
+
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.curve-svg {
+  display: block;
+
+  width: 100%;
+  max-width: 760px;
+
   margin: 20px auto 0;
 }
 
@@ -214,16 +341,21 @@
 .table-title h2 {
   margin: 6px 0 0;
 
-  font-size: 20px;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
 }
 
 .table-title > span {
   font-size: 13px;
-  color: #8b93a5;
+  font-weight: 800;
+  color: var(--ink);
 }
 
 .table-wrapper {
   overflow-x: auto;
+
+  border: var(--border);
 }
 
 .participant-table {
@@ -231,28 +363,31 @@
 
   border-collapse: collapse;
 
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .participant-table th {
   padding: 12px;
 
-  border-bottom: 1px solid #e4e7ed;
+  background: var(--ink);
+  color: var(--paper);
 
   text-align: left;
+  white-space: nowrap;
 
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: #8a93a5;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .participant-table td {
   padding: 16px 12px;
 
-  border-bottom: 1px solid #eef0f4;
+  border-bottom: 2px solid var(--ink);
 
   white-space: nowrap;
+  font-weight: 600;
 }
 
 .participant-table tbody tr:last-child td {
@@ -260,84 +395,94 @@
 }
 
 .participant-table tbody tr:hover {
-  background: #fafbfc;
+  background: #f2f2f2;
 }
 
+/* 참가자 이니셜 — 동그라미가 아니라 각진 검정 블록 */
 .participant-name {
   display: flex;
   align-items: center;
   justify-content: center;
 
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
 
-  border-radius: 50%;
+  border: var(--border);
+  border-radius: 0;
 
-  background: #111827;
-  color: #ffffff;
+  background: var(--ink);
+  color: var(--paper);
 
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 900;
 }
 
 .address {
-  padding: 6px 8px;
+  padding: 5px 8px;
 
-  background: #f3f4f6;
-
-  border-radius: 6px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 0;
 
   font-family: monospace;
+  font-weight: 700;
 }
 
+/* 확정 금액 — 표에서 가장 무겁게 읽혀야 하는 칸 */
 .claimable {
-  font-weight: 650;
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
 }
 
 /* 미실현 배당 — 아직 claimable이 아니므로 확정값(.claimable)보다 약하게 준다.
    생존 중인 참가자를 색으로 구분해주는 것이 이 칼럼의 목적이다 */
 .pending-dividend {
-  font-weight: 600;
-  color: #2563eb;
+  font-weight: 800;
+  color: var(--blue);
 }
 
-/* "—" / "정산 완료" 처럼 금액이 아닌 칸. 숫자와 같은 무게로 읽히면 안 된다 */
+/* "—" / "정산 완료" 처럼 금액이 아닌 칸. 숫자와 같은 무게로 읽히면 안 된다.
+   회색 위 회색이 되지 않게 검정 계열에서만 낮춘다 */
 .cell-muted {
-  color: #8a93a5;
+  color: #555555;
+  font-weight: 600;
 }
 
-/* Status */
+/* Status — 파스텔 금지. 원색 블록 + 검정 테두리 */
 
 .status-badge {
   display: inline-flex;
   align-items: center;
 
-  padding: 6px 9px;
+  padding: 6px 10px;
 
-  border-radius: 999px;
+  border: var(--border);
+  border-radius: 0;
 
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
-.status-badge.alive {
-  background: #eef6ff;
-  color: #2563eb;
-}
-
+/* 생존 · 완주 → 초록 + 검정 글씨 */
+.status-badge.alive,
 .status-badge.completed {
-  background: #ecfdf3;
-  color: #16803d;
+  background: var(--green);
+  color: var(--ink);
 }
 
+/* Day N 탈락 → 노랑 + 검정 글씨 */
 .status-badge.failed {
-  background: #fff7e8;
-  color: #b56813;
+  background: var(--yellow);
+  color: var(--ink);
 }
 
+/* 전액 몰수 → 빨강 + 흰 글씨 */
 .status-badge.slashed {
-  background: #fff0f0;
-  color: #c53030;
+  background: var(--red);
+  color: var(--paper);
 }
 
 /* Footer */
@@ -347,10 +492,11 @@
   flex-direction: column;
   gap: 6px;
 
-  padding: 6px 4px;
+  padding: 4px;
 
-  color: #8a93a5;
+  color: var(--ink);
   font-size: 12px;
+  font-weight: 700;
 }
 
 .footer-row {
@@ -365,13 +511,6 @@
   gap: 8px;
 }
 
-/* 밈 부제 — 기술 정보로 오해되지 않도록 이탤릭 + 더 옅게 */
-.footer-meme {
-  font-style: italic;
-  font-size: 11px;
-  color: #b8bec9;
-}
-
 /* Loading / Error */
 
 .loading-screen,
@@ -379,15 +518,15 @@
   margin-top: 100px;
   padding: 32px;
 
-  background: #ffffff;
-  border: 1px solid #e1e5ed;
-  border-radius: 12px;
+  font-weight: 700;
 }
 
 .error-screen {
   display: flex;
   flex-direction: column;
   gap: 8px;
+
+  word-break: break-all;
 }
 
 /* Responsive */
@@ -397,7 +536,11 @@
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .dashboard-header {
-    flex-direction: column;
+  .header-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .header-art {
+    width: 100%;
   }
 }

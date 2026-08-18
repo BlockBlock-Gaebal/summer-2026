@@ -224,25 +224,16 @@ export default function RefundCurve({
   ];
 
   return (
-    <section
-      style={{
-        marginTop: 32,
-        marginBottom: 32,
-      }}
-    >
+    <section className="curve-panel">
       <h2>시간가중 환급 커브</h2>
 
-      <p style={{ fontSize: 14 }}>
+      <p className="curve-caption">
         오래 완주할수록 더 많은 원금을 돌려받습니다.
       </p>
 
       <svg
+        className="curve-svg"
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        style={{
-          width: '100%',
-          maxWidth: WIDTH,
-          display: 'block',
-        }}
         role="img"
         aria-label="시간가중 환급률 커브"
       >
@@ -257,16 +248,17 @@ export default function RefundCurve({
                 y1={y}
                 x2={WIDTH - RIGHT}
                 y2={y}
-                stroke="#e5e7eb"
+                stroke="#d9d9d9"
                 strokeWidth="1"
               />
 
               <text
                 x={LEFT - 12}
-                y={y + 4}
+                y={y + 5}
                 textAnchor="end"
-                fontSize="12"
-                fill="#6b7280"
+                fontSize="13"
+                fontWeight="800"
+                fill="#000000"
               >
                 {label}
               </text>
@@ -280,7 +272,8 @@ export default function RefundCurve({
           y1={HEIGHT - BOTTOM}
           x2={WIDTH - RIGHT}
           y2={HEIGHT - BOTTOM}
-          stroke="#374151"
+          stroke="#000000"
+          strokeWidth="3"
         />
 
         {/* Y축 */}
@@ -289,7 +282,8 @@ export default function RefundCurve({
           y1={TOP}
           x2={LEFT}
           y2={HEIGHT - BOTTOM}
-          stroke="#374151"
+          stroke="#000000"
+          strokeWidth="3"
         />
 
         {/* X축 ticks */}
@@ -304,16 +298,18 @@ export default function RefundCurve({
                 x1={x}
                 y1={HEIGHT - BOTTOM}
                 x2={x}
-                y2={HEIGHT - BOTTOM + 6}
-                stroke="#374151"
+                y2={HEIGHT - BOTTOM + 7}
+                stroke="#000000"
+                strokeWidth="3"
               />
 
               <text
                 x={x}
-                y={HEIGHT - BOTTOM + 22}
+                y={HEIGHT - BOTTOM + 24}
                 textAnchor="middle"
-                fontSize="12"
-                fill="#6b7280"
+                fontSize="13"
+                fontWeight="800"
+                fill="#000000"
               >
                 {day}
               </text>
@@ -325,8 +321,8 @@ export default function RefundCurve({
         <polyline
           points={curvePoints}
           fill="none"
-          stroke="currentColor"
-          strokeWidth="3"
+          stroke="#000000"
+          strokeWidth="4"
           strokeLinejoin="round"
           strokeLinecap="round"
         />
@@ -345,10 +341,10 @@ export default function RefundCurve({
 
             /* 점이 낮으면(k가 작으면) 아래쪽 퍼센트가 x축 선·눈금과 겹친다.
                그럴 때만 퍼센트를 라벨 위로 올린다 */
-            const nearAxis = y + 24 > HEIGHT - BOTTOM - 6;
+            const nearAxis = y + 28 > HEIGHT - BOTTOM - 6;
 
-            const labelY = y - 14;
-            const rateY = nearAxis ? y - 30 : y + 24;
+            const labelY = y - 18;
+            const rateY = nearAxis ? y - 40 : y + 28;
 
             const tooltip = [
               members
@@ -366,10 +362,10 @@ export default function RefundCurve({
                 <circle
                   cx={x}
                   cy={y}
-                  r="7"
-                  fill="white"
-                  stroke="currentColor"
-                  strokeWidth="3"
+                  r="9"
+                  fill="#ffffff"
+                  stroke="#000000"
+                  strokeWidth="4"
                 >
                   <title>{tooltip}</title>
                 </circle>
@@ -378,8 +374,9 @@ export default function RefundCurve({
                   x={x}
                   y={labelY}
                   textAnchor={anchor}
-                  fontSize="13"
-                  fontWeight="700"
+                  fontSize="16"
+                  fontWeight="900"
+                  fill="#000000"
                 >
                   {labels.join(' · ')}
                 </text>
@@ -388,8 +385,9 @@ export default function RefundCurve({
                   x={x}
                   y={rateY}
                   textAnchor={anchor}
-                  fontSize="11"
-                  fill="#6b7280"
+                  fontSize="13"
+                  fontWeight="800"
+                  fill="#000000"
                 >
                   {formatRate(bp)}
                 </text>
@@ -403,8 +401,9 @@ export default function RefundCurve({
           x={LEFT + PLOT_WIDTH / 2}
           y={HEIGHT - 12}
           textAnchor="middle"
-          fontSize="13"
-          fill="#374151"
+          fontSize="14"
+          fontWeight="800"
+          fill="#000000"
         >
           완주일수 k
         </text>
@@ -414,8 +413,9 @@ export default function RefundCurve({
           x="18"
           y={TOP + PLOT_HEIGHT / 2}
           textAnchor="middle"
-          fontSize="13"
-          fill="#374151"
+          fontSize="14"
+          fontWeight="800"
+          fill="#000000"
           transform={`rotate(-90 18 ${
             TOP + PLOT_HEIGHT / 2
           })`}
