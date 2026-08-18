@@ -7,11 +7,23 @@
     "Segoe UI",
     sans-serif;
 
-  color: #171a21;
-  background: #f6f7f9;
+  color: #000000;
+  background: #ffffff;
 
-  font-synthesis: none;
   text-rendering: optimizeLegibility;
+
+  /* 브루탈리즘 팔레트 — 파스텔 없음. 원색과 검정만 쓴다.
+     배경색마다 그 위에 올릴 글자색이 정해져 있다 (대비 확보용) */
+  --ink: #000000;
+  --paper: #ffffff;
+
+  --green: #35e07a;   /* 위에 검정 글씨 */
+  --red: #dc2626;     /* 위에 흰 글씨 */
+  --yellow: #ffe600;  /* 위에 검정 글씨 */
+  --blue: #1d4ed8;    /* 위에 흰 글씨 */
+
+  --border: 3px solid #000000;
+  --hard-shadow: 6px 6px 0 #000000;
 }
 
 * {
@@ -28,7 +40,7 @@ body,
 
 body {
   min-height: 100vh;
-  background: #f6f7f9;
+  background: #ffffff;
 }
 
 button,

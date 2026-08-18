@@ -8,6 +8,8 @@ import {
 import { calcRefund, refundRate } from './curve';
 import { pendingDividendView } from './dividend';
 import RefundCurve from './RefundCurve';
+import lockedInArt from './assets/locked-in.png';
+import unemploymentMeme from './assets/unemployment.png';
 import {
   NETWORK,
   GRPC_URL,
@@ -117,30 +119,46 @@ export default function App() {
 
       {/* Header */}
       <header className="dashboard-header">
-        <div>
+        <div className="header-top">
           <div className="eyebrow">
             BLOCKBLOCK · SUI TESTNET
           </div>
 
-          <h1>Locked In (갓생 내기)</h1>
+          <div
+            className={
+              failCount >= 2
+                ? 'network-badge network-error'
+                : 'network-badge'
+            }
+          >
+            <span className="network-dot" />
 
-          <p>
-            Locked in. Paid out.
-          </p>
+            {failCount >= 2
+              ? 'CONNECTION LOST'
+              : 'LIVE'}
+          </div>
         </div>
 
-        <div
-          className={
-            failCount >= 2
-              ? 'network-badge network-error'
-              : 'network-badge'
-          }
-        >
-          <span className="network-dot" />
+        <div className="header-main">
+          <div className="header-copy">
+            <h1>LOCKED IN</h1>
 
-          {failCount >= 2
-            ? 'CONNECTION LOST'
-            : 'LIVE'}
+            <p className="header-sub">
+              <span>Discipline PvP for unemployed gambling addicts.</span>
+
+              <img
+                className="header-meme"
+                src={unemploymentMeme}
+                alt="BEST UNEMPLOYMENT MOMENTS 밈 썸네일"
+              />
+            </p>
+          </div>
+
+          <img
+            className="header-art"
+            src={lockedInArt}
+            alt="의자 끝에 걸터앉아 몸을 앞으로 기울인 사람 — locked in 자세"
+          />
         </div>
       </header>
 
@@ -218,7 +236,7 @@ export default function App() {
       </section>
 
       {/* Curve */}
-      <section className="dashboard-card curve-card">
+      <section className="dashboard-card">
         <RefundCurve
           challenge={c}
           participants={participants}
@@ -414,10 +432,6 @@ export default function App() {
               : '확인 중'}
           </div>
 
-        </div>
-
-        <div className="footer-meme">
-          discipline PvP for unemployed gambling addicts
         </div>
 
       </footer>
