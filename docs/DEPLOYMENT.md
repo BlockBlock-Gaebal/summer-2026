@@ -88,7 +88,7 @@ Table ID      0xca4d8522d37c09d0e8f6ac5a98ee8673c8da2d408a9dacc80d531c3b1fd75f80
 | 용도 | 승준의 대시보드 연동 대상, `seed.ts`/`submit.ts` 실측 검증 |
 | 파라미터 | `total_days = 5`, `alpha_bp = 2000` (α=0.2, D-06·D-14) |
 | 예치 | 3인 × 0.02 SUI = vault 0.06 SUI |
-| 상태 | **ENDED** — day1 B탈락 / day3 C탈락 / A완주 시나리오로 5일 + finalize까지 완주시킨 결과다. |
+| 상태 | **ENDED** — day1 B탈락 / day3 C탈락 / A완주 시나리오로 5일 + finalize까지 완주시킨 결과다. **검증 기준점(D-27)이라 claim·submit 금지.** |
 
 ```
 Challenge ID (shared object)
@@ -120,12 +120,16 @@ Challenge ID (shared object)
 ENDED 상태라 참가자별 탈락일·claimable이 이미 다 채워져 있다 — 대시보드 개발 시 빈 PENDING 방보다
 이쪽이 실제로 보여줄 값이 있어 더 유용할 것이다. 새 방이 필요하면 유안에게 `npm run seed` 재실행 요청.
 
+> ⚠️ **이 방은 claim도 submit도 하지 마라.** D-27의 기준점이라 상태를 그대로 보존해야 한다.
+> vault를 건드리면 `verify_onchain.py`의 "vault == 예치총합(무claim)" 검증이 깨진다.
+
 ---
 
-## 방 ④ 통합 리허설용 ★ 지금 쓸 방
+## 방 ④ 통합 리허설용 — 리허설 완료
 
 방③은 이미 ENDED라 더 이상 상태가 안 바뀐다. 대시보드 폴링(승준)이 "submit 누르면 화면이
-바뀐다"를 검증하려면 **살아있는 방**이 필요해서 새로 팠다. 3자 통합 리허설은 이 방으로 진행한다.
+바뀐다"를 검증하려면 **살아있는 방**이 필요해서 새로 팠다. 3자 통합 리허설을 이 방으로 진행했고,
+5일 시나리오를 관통시켜 종료했다 (D-29).
 
 | 항목 | 값 |
 |---|---|
@@ -133,7 +137,7 @@ ENDED 상태라 참가자별 탈락일·claimable이 이미 다 채워져 있다
 | 용도 | 3자 통합 리허설 — 대시보드 폴링 검증 |
 | 파라미터 | `total_days = 5`, `alpha_bp = 2000` (α=0.2, D-06·D-14) |
 | 예치 | 3인 × 0.02 SUI = vault 0.06 SUI |
-| 상태 | PENDING (submit 전) |
+| 상태 | **ENDED** — 통합 리허설 완주 (D-29). 검증이 끝나 vault를 회수해도 무방하다 |
 
 ```
 Challenge ID (shared object)
@@ -151,17 +155,50 @@ Challenge ID (shared object)
 | `demo-b` | `0x2a024743f3e3bc4cc1ab2b683531c54448dcd7ce124eecb0fed103dca7d56a11` | B |
 | `demo-c` | `0x8dcb2df7fc5cfa04338116567ba6d18e85bffdb3fc7f403565e540e3bc5a1524` | C |
 
-`npm run read-state -- 0xe11d89...`로 참가자 3명·PENDING·전원 claimable 0 확인 완료 (2026-08-17).
+5일 시나리오 관통 결과는 방③과 동일하다 — A=51,840,000 / B=0 / C=8,160,000 MIST, dust 0.
+`verify_onchain.py` 대조 통과(exit 0). 같은 파라미터에서 독립 재현된 것이다 (D-29).
+
+리허설은 끝났으므로 **이 방은 더 이상 쓸 일이 없다.** 검증이 완료된 방이라 vault 회수는 자유다.
 
 > ⚠️ **방③에는 절대 submit 하지 마라.** 실측 검증 결과가 담긴 기준점이라 상태 그대로 보존해야 한다.
 > ⚠️ 빈 방 `0xfb1eb0...`은 submit하는 순간 영구히 잠긴다 (D-22).
 
 ---
 
-## 발표용 방
+## 방 ⑤ 발표 실연용 ★ 실연 전까지 손대지 말 것
 
-아직 만들지 않았다. 리허설이 끝난 뒤 **발표 당일 직전에 새로 판다** (D-18: 사전 세팅).
-만들면 이 절에 ID를 적고 단톡에 통보할 것.
+D-18(사전 세팅)에 따라 실연용 방은 리허설 방을 재사용하지 않고 새로 판 것이다.
+방④는 리허설로 이미 ENDED가 되어 실연에 쓸 수 없다.
+
+| 항목 | 값 |
+|---|---|
+| 생성일 | 2026-08-18 |
+| 용도 | 발표 실연 |
+| 파라미터 | `total_days = 5`, `alpha_bp = 2000` (α=0.2, D-06·D-14) |
+| 예치 | 3인 × 0.02 SUI = vault 0.0600 SUI |
+| 상태 | **PENDING** — day 0 / 5 (submit 전) |
+
+```
+Challenge ID (shared object)
+0x7c754bb6a665a579103a678f7431a75d1b89ed1d682087e5b4ef4d52d535a1aa
+
+참가자 Table ID
+0x0ae1fd7b348841ffbb3921a7a3d9c0e18804a1c9938326f96e6973becc7daa64
+```
+
+참가자 3인 (방③·④와 동일한 A/B/C 주소를 재사용):
+
+| 별칭 | 주소 | 비고 |
+|---|---|---|
+| `yuan-oracle` | `0xb222c9e1592675d4666ea416c5d7b4acf272ed01ac23dc7248bd76fa2b3f1041` | 오라클 = 방 생성자 (A) |
+| `demo-b` | `0x2a024743f3e3bc4cc1ab2b683531c54448dcd7ce124eecb0fed103dca7d56a11` | B |
+| `demo-c` | `0x8dcb2df7fc5cfa04338116567ba6d18e85bffdb3fc7f403565e540e3bc5a1524` | C |
+
+`npm run read-state -- 0x7c754bb6...`로 참가자 3명·PENDING·day 0/5·vault 0.0600 SUI·
+전원 claimable 0 확인 완료 (2026-08-18).
+
+> ⚠️ **실연 전까지 `submit_results`를 호출하지 마라.** 한 번 진행되면 되돌릴 수 없고,
+> PENDING 상태로 복구할 방법이 없다. 리허설·시험은 끝났으니 이 방으로 다시 할 이유가 없다.
 
 ---
 
@@ -234,4 +271,6 @@ Your package is already published. You have to manually remove the publication e
 |---|---|---|---|
 | 2026-08-09 | `0xfb1eb049…` | 최초 생성 | 참가자 0명 · **사용 금지** |
 | 2026-08-10 | `0xcc48adc4…` | 검증 / 리허설 | 3인 참여 · PENDING |
-| 2026-08-15 | `0x2f6f1b32…` | 데모용(대시보드 연동 + 오라클 스크립트 실측 검증) | 3인 참여 · ENDED |
+| 2026-08-15 | `0x2f6f1b32…` | 데모용(대시보드 연동 + 오라클 스크립트 실측 검증) | 3인 참여 · ENDED · **검증 기준점, 보존** |
+| 2026-08-17 | `0xe11d8984…` | 통합 리허설(대시보드 폴링 검증) | 3인 참여 · ENDED |
+| 2026-08-18 | `0x7c754bb6…` | 발표 실연용 | 3인 참여 · PENDING · **실연 전 submit 금지** |
