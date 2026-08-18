@@ -148,12 +148,46 @@ export default function RefundCurve({
     },
   ).join(' ');
 
-  const participantPoints = participants.map(
-    (participant, index) => {
+  /**
+   * 같은 k를 가진 참가자는 좌표가 완전히 일치한다
+   * (환급률이 k만의 함수이므로 x도 y도 같다).
+   *
+   * 그대로 그리면 점·라벨·퍼센트가 겹쳐서
+   * "A"와 "C"가 "Å"처럼, "20.8%" 두 개가 "28.8%"처럼 읽힌다.
+   *
+   * 그래서 k로 묶어 점 하나만 찍고,
+   * 라벨은 "A · C"로 합치고 퍼센트는 한 번만 쓴다.
+   * 참가자가 몇 명으로 늘어도 점 개수는 서로 다른 k의 개수만큼만 늘어난다.
+   */
+  const groupedPoints = (() => {
+    const byK = new Map<
+      string,
+      {
+        k: bigint;
+        bp: bigint;
+        x: number;
+        y: number;
+        labels: string[];
+        members: ParticipantState[];
+      }
+    >();
+
+    participants.forEach((participant, index) => {
       const k = completedDays(
         participant,
         challenge,
       );
+
+      const key = String(k);
+      const label = String.fromCharCode(65 + index);
+
+      const existing = byK.get(key);
+
+      if (existing) {
+        existing.labels.push(label);
+        existing.members.push(participant);
+        return;
+      }
 
       const bp = refundRateBp(
         k,
@@ -161,16 +195,20 @@ export default function RefundCurve({
         alphaBp,
       );
 
-      return {
-        participant,
-        label: String.fromCharCode(65 + index),
+      byK.set(key, {
         k,
         bp,
         x: xFromK(k, totalDays),
         y: yFromBp(bp),
-      };
-    },
-  );
+        labels: [label],
+        members: [participant],
+      });
+    });
+
+    return Array.from(byK.values()).sort(
+      (a, b) => (a.k < b.k ? -1 : a.k > b.k ? 1 : 0),
+    );
+  })();
 
   const dayTicks = Array.from(
     { length: Number(totalDays) + 1 },
@@ -293,48 +331,71 @@ export default function RefundCurve({
           strokeLinecap="round"
         />
 
-        {/* 참가자 점 */}
-        {participantPoints.map(
-          ({ participant, label, k, bp, x, y }, index) => (
-            <g key={participant.address}>
-              <circle
-                cx={x}
-                cy={y}
-                r="7"
-                fill="white"
-                stroke="currentColor"
-                strokeWidth="3"
-              >
-                <title>
-                  {label} ({shortAddress(participant.address)})
-                  {' · '}
-                  k={String(k)}
-                  {' · '}
+        {/* 참가자 점 — 같은 k는 한 점으로 묶여 있다 */}
+        {groupedPoints.map(
+          ({ k, bp, x, y, labels, members }) => {
+            /* 라벨이 길어져도(A · B · C · D) 플롯 밖으로 나가지 않게
+               가장자리에서는 기준점을 안쪽으로 돌린다 */
+            const anchor =
+              x < LEFT + 40
+                ? 'start'
+                : x > WIDTH - RIGHT - 40
+                  ? 'end'
+                  : 'middle';
+
+            /* 점이 낮으면(k가 작으면) 아래쪽 퍼센트가 x축 선·눈금과 겹친다.
+               그럴 때만 퍼센트를 라벨 위로 올린다 */
+            const nearAxis = y + 24 > HEIGHT - BOTTOM - 6;
+
+            const labelY = y - 14;
+            const rateY = nearAxis ? y - 30 : y + 24;
+
+            const tooltip = [
+              members
+                .map(
+                  (member, i) =>
+                    `${labels[i]} (${shortAddress(member.address)})`,
+                )
+                .join(', '),
+              `k=${String(k)}`,
+              formatRate(bp),
+            ].join(' · ');
+
+            return (
+              <g key={String(k)}>
+                <circle
+                  cx={x}
+                  cy={y}
+                  r="7"
+                  fill="white"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                >
+                  <title>{tooltip}</title>
+                </circle>
+
+                <text
+                  x={x}
+                  y={labelY}
+                  textAnchor={anchor}
+                  fontSize="13"
+                  fontWeight="700"
+                >
+                  {labels.join(' · ')}
+                </text>
+
+                <text
+                  x={x}
+                  y={rateY}
+                  textAnchor={anchor}
+                  fontSize="11"
+                  fill="#6b7280"
+                >
                   {formatRate(bp)}
-                </title>
-              </circle>
-
-              <text
-                x={x}
-                y={y - 14 - index * 2}
-                textAnchor="middle"
-                fontSize="13"
-                fontWeight="700"
-              >
-                {label}
-              </text>
-
-              <text
-                x={x}
-                y={y + 24 + index * 2}
-                textAnchor="middle"
-                fontSize="11"
-                fill="#6b7280"
-              >
-                {formatRate(bp)}
-              </text>
-            </g>
-          ),
+                </text>
+              </g>
+            );
+          },
         )}
 
         {/* X축 제목 */}

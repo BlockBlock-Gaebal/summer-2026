@@ -344,8 +344,8 @@
 
 .dashboard-footer {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 6px;
 
   padding: 6px 4px;
 
@@ -353,10 +353,23 @@
   font-size: 12px;
 }
 
-.dashboard-footer > div:first-child {
+.footer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.footer-row > div:first-child {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* 밈 부제 — 기술 정보로 오해되지 않도록 이탤릭 + 더 옅게 */
+.footer-meme {
+  font-style: italic;
+  font-size: 11px;
+  color: #b8bec9;
 }
 
 /* Loading / Error */
