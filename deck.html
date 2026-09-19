@@ -85,6 +85,8 @@
   .node .s { font-size: clamp(12px, 1.2vw, 19px); line-height: 1.45; color: var(--text); }
   .node .s b { font-weight: 700; }
   .pipe { display: flex; align-items: center; color: var(--muted); font-size: clamp(18px, 2vw, 32px); }
+  .pipe2 { flex-direction: column; justify-content: center; gap: 0.2vh; line-height: 1; }
+  .pipe2 .lbl { font-size: clamp(10px, 0.95vw, 14px); white-space: nowrap; }
   .legend { display: flex; gap: 2vw; margin-top: 4vh; font-size: clamp(13px, 1.3vw, 20px); color: var(--muted); }
   .sw { display: inline-block; width: 0.9em; height: 0.9em; border-radius: 3px; vertical-align: -0.1em; margin-right: 0.4em; }
 
@@ -127,6 +129,25 @@
   .dust .zero { font-size: clamp(40px, 6vw, 96px); font-weight: 900; color: var(--pass); line-height: 1; }
   .dust .cap { font-size: clamp(15px, 1.6vw, 26px); }
   .dust .meme { font-size: clamp(13px, 1.3vw, 20px); color: var(--muted); font-style: italic; }
+
+  /* 5.5 days */
+  .days { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1vw; }
+  .day { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 1.6vh 1.2vw; font-size: clamp(13px, 1.4vw, 22px); }
+  .day b { display: block; font-size: 1.15em; margin-bottom: 1vh; }
+  .day .p { display: flex; justify-content: space-between; align-items: center; padding: 0.6vh 0; border-top: 1px dashed var(--line); }
+  .day .p:first-of-type { border-top: 0; }
+  .day .cap { color: var(--muted); font-size: 0.78em; margin-top: 1.2vh; line-height: 1.35; }
+  .day .tag { margin-left: 0; font-size: 0.72em; }
+
+  /* 7. money bars */
+  .money { display: grid; gap: 1vh; margin-top: 2.4vh; }
+  .money .row { display: grid; grid-template-columns: 6em 1fr 9em; align-items: center; gap: 1.2vw; font-size: clamp(13px, 1.4vw, 22px); }
+  /* 슬라이드 7의 세로 막대 .bar 규칙을 덮어쓴다 (가로·왼쪽 정렬) */
+  .money .bar { height: 2.4vh; border-radius: 6px; display: flex; flex-direction: row; align-items: stretch; justify-content: flex-start; flex: none; overflow: hidden; background: var(--line); }
+  .money .seg { height: 100%; }
+  .money .num { font-family: var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+  .money .legend { margin-top: 0.6vh; }
+  .dust { margin-top: 2.4vh !important; }
 
   /* 8. limits */
   .lim { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4vh 2.4vw; }
@@ -212,10 +233,10 @@
     </div>
     <div class="card">
       <h3 class="accent">근데 AI를 운영자가 돌리면?</h3>
-      <p>GymPact와 같아진다. 그래서 <b>판정 근거를 Walrus에</b> 공개로 남긴다 — 누구나 재생 가능.</p>
+      <p>GymPact와 같아진다. 그래서 <b>판정 근거를 Walrus에</b> 공개로 남긴다 — blobId를 알면 누구나 재생 가능.</p>
     </div>
   </div>
-  <p style="margin-top:4vh;font-size:clamp(18px,2.2vw,34px);font-weight:700">돈은 Sui, 판정은 AI, 근거는 Walrus.<br><span class="muted" style="font-weight:500">셋 다 같은 원칙 — 운영자를 믿지 않는다.</span></p>
+  <p style="margin-top:4vh;font-size:clamp(18px,2.2vw,34px);font-weight:700">돈과 정산은 운영자를 믿지 않는다.<br><span class="muted" style="font-weight:500">판정은 재생 가능하게 만들었고, 판정의 탈중앙화가 다음 단계다.</span></p>
 </section>
 
 <!-- 3. 환급 커브 -->
@@ -253,7 +274,7 @@
       <div class="t">AI 판정 에이전트</div>
       <div class="s">① <b>Walrus</b>에서 기억 로드<br>② <b>LLM 판정</b><br>&nbsp;&nbsp;&nbsp;규칙 + 과거 기록 + 오늘 제출<br>③ 제출 성공 시 기억을 Walrus에 저장</div>
     </div>
-    <div class="pipe">→</div>
+    <div class="pipe pipe2"><span>→</span><span class="lbl">매일 생존자·day 읽기</span><span>←</span></div>
     <div class="node summer">
       <div class="t">Sui (Move)</div>
       <div class="s"><b>submit_results</b>(탈락자 명단)<br>→ 몰수<br>→ 스트리밍 재분배<br>→ finalize · claim</div>
@@ -268,7 +289,7 @@
     <span><span class="sw" style="background:var(--summer)"></span>여름에 만든 것 — 컨트랙트 · 정산 · 대시보드</span>
     <span><span class="sw" style="background:var(--today)"></span>오늘 만든 것 — 입력 · 기억 · 판정</span>
   </div>
-  <p class="muted" style="margin-top:2vh">컨트랙트는 재배포하지 않았다. 비워 두었던 판정 자리에 에이전트가 들어갔다.</p>
+  <p class="muted" style="margin-top:2vh">컨트랙트는 재배포하지 않았다. 비워 두었던 판정 자리에 에이전트가 들어갔다.<br>체인이 누굴 심사할지 알려주고, 에이전트가 결과를 쓰고, 그 결과가 다음 날 입력이 된다.</p>
 </section>
 
 <!-- 5. 터미널 전환 -->
@@ -281,6 +302,20 @@
     <div class="muted">▶ 0xca849b… 과거 기록 2건 로드 (day 1, 2) → 판정: <span style="color:var(--fail)">FAIL</span></div>
     <div><span class="cursor"></span></div>
   </div>
+</section>
+
+<!-- 5.5 발표용 방에서 일어난 일 -->
+<section class="slide" data-title="days">
+  <p class="kicker">실제로 돌린 5일 · 발표용 방 0x68295a39…</p>
+  <h2>발표용 방에서 일어난 일</h2>
+  <div class="days">
+    <div class="day"><b>Day 1</b><div class="p"><span>A</span><span class="tag pass">PASS</span></div><div class="p"><span>B</span><span class="tag pass">PASS</span></div><div class="p"><span>C</span><span class="tag pass">PASS</span></div><div class="cap">기억 0건 로드 · 빈 기억으로 시작</div></div>
+    <div class="day"><b>Day 2</b><div class="p"><span>A</span><span class="tag pass">PASS</span></div><div class="p"><span>B</span><span class="tag pass">PASS</span></div><div class="p"><span>C</span><span class="tag pass">PASS</span></div><div class="cap">기억 3건 로드</div></div>
+    <div class="day"><b>Day 3</b><div class="p"><span>A</span><span class="tag pass">PASS</span></div><div class="p"><span>B</span><span class="tag pass">PASS</span></div><div class="p"><span>C</span><span class="tag fail">FAIL</span></div><div class="cap">기억 6건 로드 · C가 Day 1을 재서술</div></div>
+    <div class="day"><b>Day 4</b><div class="p"><span>A</span><span class="tag pass">PASS</span></div><div class="p"><span>B</span><span class="tag fail">FAIL</span></div><div class="p"><span>C</span><span class="muted">탈락</span></div><div class="cap">기억 9건 로드 · B가 Day 2를 재서술</div></div>
+    <div class="day"><b>Day 5</b><div class="p"><span>A</span><span class="tag pass">PASS</span></div><div class="p"><span>B</span><span class="muted">탈락</span></div><div class="p"><span>C</span><span class="muted">탈락</span></div><div class="cap">기억 11건 로드 · finalize → 정산 확정</div></div>
+  </div>
+  <p class="muted" style="margin-top:3vh">A는 알고리즘, B는 운영체제, C는 확률을 공부했다. 공부 내용 자체는 멀쩡했고, 떨어진 이유는 오직 <b class="accent">예전에 낸 걸 표현만 바꿔 재제출</b>한 것이다.</p>
 </section>
 
 <!-- 6. 기억이 판정을 바꾼다 -->
@@ -325,6 +360,12 @@
       <tr class="total"><td>합계</td><td></td><td class="num">60,000,000</td><td class="num">60,000,000 = vault</td></tr>
     </tbody>
   </table>
+  <div class="money">
+    <div class="row"><span>A · 완주</span><div class="bar"><div class="seg" style="width:33.3%;background:var(--summer)"></div><div class="seg" style="width:41.7%;background:var(--pass)"></div></div><span class="num">45,040,000</span></div>
+    <div class="row"><span>B · Day 4</span><div class="bar"><div class="seg" style="width:13.6%;background:var(--summer)"></div><div class="seg" style="width:4.4%;background:var(--pass)"></div></div><span class="num">10,800,000</span></div>
+    <div class="row"><span>C · Day 3</span><div class="bar"><div class="seg" style="width:6.9%;background:var(--summer)"></div></div><span class="num">4,160,000</span></div>
+    <div class="legend" style="margin-top:1vh"><span><span class="sw" style="background:var(--summer)"></span>자기 돈에서 돌려받은 몫 (환급)</span><span><span class="sw" style="background:var(--pass)"></span>남의 몰수액에서 받은 몫 (배당)</span><span>막대 길이 = 60,000,000 대비 비율</span></div>
+  </div>
   <div class="dust">
     <div class="zero">dust 0</div>
     <div>
@@ -339,6 +380,10 @@
   <p class="kicker">한계와 확장</p>
   <h2>아직 안 된 것, 다음에 할 것</h2>
   <div class="lim">
+    <div class="row" style="grid-column:1/-1">
+      <div class="a">데모에서는 오라클이 참가자 A와 동일 주소다</div>
+      <div class="b">→ 컨트랙트는 오라클을 별도 주소로 받는다. 실서비스에서는 <span class="accent">오라클 키를 참가자와 분리</span></div>
+    </div>
     <div class="row">
       <div class="a">Walrus blob은 공개 — 제출 원문이 노출된다</div>
       <div class="b">→ <span class="accent">Seal</span>로 원문은 가리고 판정 근거만 공개하는 분리</div>
@@ -364,7 +409,6 @@
       <div class="b">→ dry-run 명단과 다르면 제출하지 않는다 (<span class="mono">--expect-fail</span>). 되돌릴 수 없는 호출 앞의 안전장치</div>
     </div>
   </div>
-  <p class="muted" style="margin-top:2.4vh">데모에서는 오라클이 참가자 A와 동일 주소다 — 실서비스에서는 오라클 키를 참가자와 분리한다.</p>
 </section>
 
 <div class="progress" id="progress"></div>
