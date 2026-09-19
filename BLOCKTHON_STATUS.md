@@ -37,11 +37,11 @@
 | 참가자 C | `0xca849b28f4729eb7dfe03cd6facb35f269e24497816f801ba71de81e424d1bdb` |
 | 1차 방 (백업 방) | `0x5ea794e536eccc38f00e8b4d10759236ce8b08afc657dc0d35283a24e2034953` |
 | 2차 방 (발표용 방, Walrus 연동) | `0x68295a39ed52b65876aaa0fcc7c84543aaefdfd9c533768f2bd008735b987218` |
-| 3차 방 (Q&A 라이브 dry-run용, PENDING) | `0x5e6cd1579442041ed2a0c2da9d274df80e074961d6bb78edcc199020f997838f` |
+| 3차 방 (Q&A 라이브 dry-run용, ACTIVE day 2/5) | `0x5e6cd1579442041ed2a0c2da9d274df80e074961d6bb78edcc199020f997838f` |
 
-3차 방은 3인 join까지만 되어 있고 제출은 하지 않았다. `scripts/.env`의 `CHALLENGE_ID`가 이 방을 가리키며,
-`.walrus-memory`는 비워 두었다 (발표용 방 최종 blobId `xoDph4cl6J9mZjQ9HiL7kMAdJYsGCy7a7CSuT5RBt6Y`는 §5-1 참조).
-Q&A에서 "지금 돌려볼 수 있냐"가 나오면 `cd scripts && npx tsx agent.ts 1 --dry-run`을 친다. 제출은 하지 않는다.
+3차 방은 발표용 방과 같은 evidence로 **day 2까지 제출**해 두었다 (day1 `2kZyRtJN…`, day2 `Bqp286Gv…`, 둘 다 전원 PASS).
+`scripts/.env`의 `CHALLENGE_ID`가 이 방을 가리키고, `.walrus-memory`는 day2 blob `yOEO1ytS0SeE6jtueRtKD922FZNDLLfMV7rBGI7mzG0`(기억 6건)을 가리킨다.
+Q&A에서 "지금 돌려볼 수 있냐"가 나오면 `cd scripts && npx tsx agent.ts 3 --dry-run`을 친다 — 기억 6건을 로드해 C가 중복 FAIL로 나온다. **제출은 하지 않는다.**
 
 `docs/DEPLOYMENT.md`에는 오라클 `0x982fcf2d…`가 진모의 오라클 주소로 기록되어 있으나,
 WSL 키스토어에서 해당 키를 찾지 못했다. 다른 환경에 있을 가능성이 있다.
