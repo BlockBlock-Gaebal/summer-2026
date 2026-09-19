@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Locked In — Blockthon 2026</title>
+<style>
+  :root {
+    --bg: #0d0f14;
+    --panel: #161a22;
+    --line: #2a303c;
+    --text: #e8eaf0;
+    --muted: #8b93a7;
+    --summer: #4c8dff;
+    --summer-bg: rgba(76, 141, 255, 0.12);
+    --today: #ff8a3d;
+    --today-bg: rgba(255, 138, 61, 0.12);
+    --pass: #3ecf8e;
+    --fail: #ff5c5c;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  .slide {
+    position: absolute; inset: 0;
+    display: none; flex-direction: column; justify-content: center;
+    padding: 6vh 7vw 9vh;
+  }
+  .slide.active { display: flex; }
+  .kicker { color: var(--muted); font-size: clamp(13px, 1.4vw, 20px); letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 1.2vh; }
+  h1 { font-size: clamp(40px, 6.4vw, 104px); line-height: 1.02; margin: 0; letter-spacing: -0.02em; }
+  h2 { font-size: clamp(28px, 3.6vw, 60px); line-height: 1.1; margin: 0 0 3.5vh; letter-spacing: -0.01em; }
+  p, li { font-size: clamp(16px, 1.75vw, 28px); line-height: 1.5; }
+  .muted { color: var(--muted); }
+  .mono { font-family: var(--mono); }
+  .accent { color: var(--today); }
+  .blue { color: var(--summer); }
+  ul { margin: 0; padding-left: 1.2em; }
+  li + li { margin-top: 0.6vh; }
+
+  /* 1. title */
+  .title-sub {
+    font-size: clamp(28px, 4.4vw, 76px); font-weight: 800; line-height: 1.08;
+    margin: 4vh 0 0; max-width: 16ch; padding-bottom: 0.14em;
+    background: linear-gradient(90deg, var(--today), #ffd166);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .title-foot { margin-top: 5vh; display: flex; gap: 1.2vw; flex-wrap: wrap; }
+  .chip {
+    font-size: clamp(12px, 1.2vw, 18px); padding: 0.45em 0.9em; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--muted); white-space: nowrap;
+  }
+  .disclaimer { position: absolute; right: 7vw; bottom: 9vh; font-size: clamp(11px, 1vw, 15px); color: var(--muted); font-style: italic; }
+
+  /* 2. problem */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 3vw; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 3vh 2.2vw; }
+  .card h3 { margin: 0 0 1.5vh; font-size: clamp(18px, 2vw, 32px); }
+  .big-q { font-size: clamp(22px, 2.6vw, 42px); font-weight: 700; line-height: 1.3; }
+  .timeline { display: flex; align-items: center; gap: 1vw; flex-wrap: wrap; margin-bottom: 4vh; }
+  .timeline .step { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1.2vh 1.2vw; font-size: clamp(14px, 1.5vw, 24px); }
+  .timeline .step.bad { border-color: var(--fail); color: var(--fail); }
+  .timeline .arrow { color: var(--muted); font-size: clamp(14px, 1.5vw, 24px); }
+
+  /* 3. curve */
+  .curve-wrap { display: grid; grid-template-columns: 1.15fr 1fr; gap: 3vw; align-items: center; }
+  .formula { font-family: var(--mono); font-size: clamp(18px, 2.1vw, 34px); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 2vh 1.6vw; margin-bottom: 3vh; }
+  .stat-row { display: flex; gap: 2vw; margin-top: 2vh; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 2vh 1.6vw; flex: 1; }
+  .stat .v { font-size: clamp(28px, 3.6vw, 58px); font-weight: 800; }
+  .stat .l { color: var(--muted); font-size: clamp(12px, 1.2vw, 18px); }
+  svg text { font-family: inherit; }
+
+  /* 4. architecture */
+  .arch { display: grid; grid-template-columns: 1fr auto 1.6fr auto 1.6fr auto 1fr; align-items: stretch; gap: 0.8vw; }
+  .node { border-radius: 14px; padding: 2.2vh 1.2vw; border: 2px solid; display: flex; flex-direction: column; gap: 1vh; }
+  .node.today { border-color: var(--today); background: var(--today-bg); }
+  .node.summer { border-color: var(--summer); background: var(--summer-bg); }
+  .node .t { font-weight: 800; font-size: clamp(15px, 1.6vw, 26px); }
+  .node .s { font-size: clamp(12px, 1.2vw, 19px); line-height: 1.45; color: var(--text); }
+  .node .s b { font-weight: 700; }
+  .pipe { display: flex; align-items: center; color: var(--muted); font-size: clamp(18px, 2vw, 32px); }
+  .legend { display: flex; gap: 2vw; margin-top: 4vh; font-size: clamp(13px, 1.3vw, 20px); color: var(--muted); }
+  .sw { display: inline-block; width: 0.9em; height: 0.9em; border-radius: 3px; vertical-align: -0.1em; margin-right: 0.4em; }
+
+  /* 5. switch */
+  .switch { align-items: center; text-align: center; }
+  .switch .term {
+    font-family: var(--mono); font-size: clamp(16px, 1.8vw, 28px); text-align: left;
+    background: #07080b; border: 1px solid var(--line); border-radius: 12px; padding: 3vh 2.4vw; margin-top: 5vh;
+    min-width: min(80vw, 900px);
+  }
+  .switch .term .p { color: var(--pass); }
+  .cursor { display: inline-block; width: 0.6em; height: 1.1em; background: var(--text); vertical-align: -0.15em; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* 6. memory */
+  .mem-grid { display: grid; grid-template-columns: 1fr 1.25fr; gap: 3vw; align-items: start; }
+  .bars { display: flex; align-items: flex-end; gap: 1.2vw; height: 32vh; border-bottom: 1px solid var(--line); padding-bottom: 0.5vh; }
+  .bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+  .bar .fill { width: 100%; background: var(--today); border-radius: 6px 6px 0 0; min-height: 3px; }
+  .bar .n { font-weight: 800; font-size: clamp(16px, 1.8vw, 28px); margin-bottom: 0.6vh; }
+  .bar-labels { display: flex; gap: 1.2vw; margin-top: 1vh; }
+  .bar-labels span { flex: 1; text-align: center; color: var(--muted); font-size: clamp(12px, 1.2vw, 18px); }
+  .quote { border-left: 4px solid var(--fail); background: var(--panel); border-radius: 0 12px 12px 0; padding: 2vh 1.6vw; margin-bottom: 2.4vh; }
+  .quote .who { font-size: clamp(13px, 1.3vw, 20px); color: var(--fail); font-weight: 700; margin-bottom: 0.8vh; }
+  .quote .what { font-size: clamp(15px, 1.55vw, 24px); line-height: 1.5; }
+  .quote .src { font-size: clamp(11px, 1vw, 15px); color: var(--muted); margin-top: 0.8vh; }
+
+  /* 7. settlement */
+  table { border-collapse: collapse; width: 100%; font-size: clamp(16px, 1.9vw, 30px); }
+  th, td { padding: 1.6vh 1.4vw; text-align: left; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 0.7em; letter-spacing: 0.04em; }
+  td.num { font-family: var(--mono); text-align: right; }
+  tr.total td { border-bottom: none; font-weight: 800; }
+  .tag { font-size: 0.62em; padding: 0.25em 0.7em; border-radius: 999px; margin-left: 0.6em; vertical-align: 0.15em; white-space: nowrap; }
+  .tag.pass { background: rgba(62, 207, 142, 0.15); color: var(--pass); }
+  .tag.fail { background: rgba(255, 92, 92, 0.15); color: var(--fail); }
+  .dust {
+    margin-top: 4vh; display: flex; align-items: center; gap: 2vw; flex-wrap: wrap;
+  }
+  .dust .zero { font-size: clamp(40px, 6vw, 96px); font-weight: 900; color: var(--pass); line-height: 1; }
+  .dust .cap { font-size: clamp(15px, 1.6vw, 26px); }
+  .dust .meme { font-size: clamp(13px, 1.3vw, 20px); color: var(--muted); font-style: italic; }
+
+  /* 8. limits */
+  .lim { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4vh 2.4vw; }
+  .lim .row { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 1.8vh 1.4vw; }
+  .lim .row .a { font-weight: 700; font-size: clamp(14px, 1.45vw, 23px); }
+  .lim .row .b { color: var(--muted); font-size: clamp(13px, 1.25vw, 20px); margin-top: 0.6vh; line-height: 1.45; }
+  .lim .row .b .accent { font-weight: 700; }
+
+  /* chrome */
+  .progress { position: fixed; left: 0; bottom: 0; height: 4px; background: var(--today); transition: width 0.25s ease; }
+  .counter { position: fixed; right: 2vw; bottom: 2.4vh; font-family: var(--mono); color: var(--muted); font-size: clamp(11px, 1vw, 15px); }
+  .hint { position: fixed; left: 2vw; bottom: 2.4vh; color: var(--muted); font-size: clamp(11px, 1vw, 15px); }
+
+  @media (max-width: 760px) {
+    body { overflow: auto; }
+    .slide { padding: 5vh 16px 10vh; justify-content: flex-start; overflow-y: auto; }
+    .cols, .curve-wrap, .mem-grid, .lim { grid-template-columns: 1fr; }
+    .arch { grid-template-columns: 1fr; }
+    .pipe { justify-content: center; transform: rotate(90deg); }
+    .disclaimer { position: static; margin-top: 3vh; }
+    .switch .term { min-width: 0; width: 100%; }
+    .hint { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 1. 타이틀 -->
+<section class="slide" data-title="title">
+  <p class="kicker">Blockthon 2026 · Sui × Walrus</p>
+  <h1>Locked In <span class="muted" style="font-weight:600">(갓생 내기)</span></h1>
+  <p class="title-sub">discipline PvP for unemployed gambling addicts</p>
+  <div class="title-foot">
+    <span class="chip">돈을 걸고</span>
+    <span class="chip">AI가 판정하고</span>
+    <span class="chip">체인이 정산한다</span>
+  </div>
+  <div class="disclaimer">not financial advice. not life advice either.</div>
+</section>
+
+<!-- 2. 문제 -->
+<section class="slide" data-title="problem">
+  <p class="kicker">문제</p>
+  <h2>돈 걸고 하는 습관 앱은 이미 한 번 망했다</h2>
+  <div class="timeline">
+    <div class="step">GymPact (Pact)<br><span class="muted" style="font-size:.8em">운동 내기 앱</span></div>
+    <div class="arrow">→</div>
+    <div class="step">회사가 예치금을 쥐고<br>성공·실패를 판정</div>
+    <div class="arrow">→</div>
+    <div class="step bad">성공한 사용자에게도 과금<br><span style="font-size:.8em">FTC 제재 · $948,788 환불 명령</span></div>
+    <div class="arrow">→</div>
+    <div class="step bad">폐업</div>
+  </div>
+  <div class="cols">
+    <div class="card">
+      <h3 class="blue">① 돈을 누가 쥐는가</h3>
+      <p class="big-q">중앙 커스터디 = 운영사를 믿어야 한다</p>
+      <p class="muted">→ 예치·몰수·재분배를 Move 컨트랙트가 집행한다</p>
+    </div>
+    <div class="card">
+      <h3 class="accent">② 판정을 누가 하는가</h3>
+      <p class="big-q">판정이 블랙박스 = 운영사를 믿어야 한다</p>
+      <p class="muted">→ 기억을 가진 AI 에이전트가 근거와 함께 판정한다</p>
+    </div>
+  </div>
+</section>
+
+<!-- 3. 환급 커브 -->
+<section class="slide" data-title="curve">
+  <p class="kicker">정산 엔진 · 여름에 만든 것</p>
+  <h2>늦게 무너질수록 더 돌려받는다</h2>
+  <div class="curve-wrap">
+    <div>
+      <div class="formula">R(k) = α·(k/D) + (1−α)·(k/D)²</div>
+      <ul>
+        <li>k일 버티고 탈락하면 예치금의 R(k)를 환급</li>
+        <li><b>α = 0.2</b>는 감으로 정한 값이 아니다 — 목표 배율(마지막 하루 ÷ 첫날)에서 <b>역산</b></li>
+        <li>몰수분은 한 번에 나눠주지 않고 남은 날에 걸쳐 <b>스트리밍 재분배</b></li>
+      </ul>
+      <div class="stat-row">
+        <div class="stat"><div class="v blue" id="ratio5">4.6×</div><div class="l">D = 5 (데모 방)</div></div>
+        <div class="stat"><div class="v blue">7.8×</div><div class="l">D = 30 (실서비스 상정)</div></div>
+      </div>
+    </div>
+    <svg id="curve" viewBox="0 0 520 400" role="img" aria-label="D=5, alpha=0.2 환급 커브와 일별 가치"></svg>
+  </div>
+</section>
+
+<!-- 4. 아키텍처 -->
+<section class="slide" data-title="architecture">
+  <p class="kicker">아키텍처</p>
+  <h2>입력에서 온체인 정산까지 한 줄로</h2>
+  <div class="arch">
+    <div class="node today">
+      <div class="t">사용자</div>
+      <div class="s">그날 공부한 내용을<br><b>텍스트로 제출</b></div>
+    </div>
+    <div class="pipe">→</div>
+    <div class="node today">
+      <div class="t">AI 판정 에이전트</div>
+      <div class="s">① <b>Walrus</b>에서 기억 로드<br>② <b>LLM 판정</b><br>&nbsp;&nbsp;&nbsp;규칙 + 과거 기록 + 오늘 제출<br>③ 제출 성공 시 기억을 Walrus에 저장</div>
+    </div>
+    <div class="pipe">→</div>
+    <div class="node summer">
+      <div class="t">Sui (Move)</div>
+      <div class="s"><b>submit_results</b>(탈락자 명단)<br>→ 몰수<br>→ 스트리밍 재분배<br>→ finalize · claim</div>
+    </div>
+    <div class="pipe">→</div>
+    <div class="node summer">
+      <div class="t">대시보드</div>
+      <div class="s">체인 상태를<br>실시간 폴링</div>
+    </div>
+  </div>
+  <div class="legend">
+    <span><span class="sw" style="background:var(--summer)"></span>여름에 만든 것 — 컨트랙트 · 정산 · 대시보드</span>
+    <span><span class="sw" style="background:var(--today)"></span>오늘 만든 것 — 입력 · 기억 · 판정</span>
+  </div>
+  <p class="muted" style="margin-top:2vh">컨트랙트는 재배포하지 않았다. 비워 두었던 판정 자리에 에이전트가 들어갔다.</p>
+</section>
+
+<!-- 5. 터미널 전환 -->
+<section class="slide switch" data-title="switch">
+  <p class="kicker">라이브</p>
+  <h2>터미널로 전환합니다</h2>
+  <div class="term">
+    <div><span class="p">$</span> npx tsx agent.ts 3 --dry-run</div>
+    <div class="muted">Walrus에서 기억 로드: blobId=GvMPYg… (6건)</div>
+    <div class="muted">▶ 0xca849b… 판정: <span style="color:var(--fail)">FAIL</span></div>
+    <div><span class="cursor"></span></div>
+  </div>
+</section>
+
+<!-- 6. 기억이 판정을 바꾼다 -->
+<section class="slide" data-title="memory">
+  <p class="kicker">왜 블록체인 + AI인가</p>
+  <h2>기억이 판정을 바꾼다</h2>
+  <div class="mem-grid">
+    <div>
+      <p class="muted" style="margin:0 0 2vh">판정 전 Walrus에서 불러온 기억 (건)</p>
+      <div class="bars" id="bars"></div>
+      <div class="bar-labels" id="barLabels"></div>
+      <p class="muted" style="margin-top:2.4vh;font-size:clamp(13px,1.3vw,20px)">매 day 새 blob으로 저장 → 다음 날 그 blobId에서 로드.<br>저장 직후 다시 읽어 5회 모두 원본과 일치.</p>
+    </div>
+    <div>
+      <div class="quote">
+        <div class="who">day 3 · 참가자 C · FAIL</div>
+        <div class="what">“Day 1의 내용(조건부확률, 베이즈 정리 유도, 질병 검사 양성 사후확률 계산 5문제)과 사실상 동일한 내용을 재서술한 것으로 판단된다.”</div>
+        <div class="src">기억 6건 로드 후 판정 · tx 6s9Gz49d…</div>
+      </div>
+      <div class="quote">
+        <div class="who">day 4 · 참가자 B · FAIL</div>
+        <div class="what">“day 2에서 이미 학습한 교착상태 4가지 필요조건 정리 및 은행원 알고리즘 예제 2개 풀이와 사실상 동일하다.”</div>
+        <div class="src">기억 9건 로드 후 판정 · tx 8ALZt3Ee…</div>
+      </div>
+      <p style="margin:0">둘 다 <b>공부 내용으로는 합격</b>이다. 떨어진 이유는 <b class="accent">기억에 있던 과거 제출과의 중복</b> 하나뿐 — 기억이 없으면 통과했을 제출이다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 7. 최종 정산 -->
+<section class="slide" data-title="settlement">
+  <p class="kicker">최종 정산 · Sui Testnet · ENDED</p>
+  <h2>누가 얼마를 가져가는가</h2>
+  <table>
+    <thead>
+      <tr><th>참가자</th><th>결과</th><th style="text-align:right">예치 (MIST)</th><th style="text-align:right">claimable (MIST)</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>A <span class="muted mono" style="font-size:.7em">0x1d0b…9249</span></td><td>완주 <span class="tag pass">sigma grindset</span></td><td class="num">20,000,000</td><td class="num" style="color:var(--pass)">45,040,000</td></tr>
+      <tr><td>B <span class="muted mono" style="font-size:.7em">0xdf89…e71b</span></td><td>day 4 탈락 <span class="tag fail">그저께 한 거 또 냄</span></td><td class="num">20,000,000</td><td class="num">10,800,000</td></tr>
+      <tr><td>C <span class="muted mono" style="font-size:.7em">0xca84…1bdb</span></td><td>day 3 탈락 <span class="tag fail">베이즈 정리 재방송</span></td><td class="num">20,000,000</td><td class="num">4,160,000</td></tr>
+      <tr class="total"><td>합계</td><td></td><td class="num">60,000,000</td><td class="num">60,000,000 = vault</td></tr>
+    </tbody>
+  </table>
+  <div class="dust">
+    <div class="zero">dust 0</div>
+    <div>
+      <div class="cap">1 MIST도 증발하지 않았다. 보존 법칙을 화면에서 그대로 검산할 수 있다.</div>
+      <div class="meme">늦게 떨어진 B가 C보다 더 돌려받는다. 존버는 과학이다.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 8. 한계와 확장 -->
+<section class="slide" data-title="limits">
+  <p class="kicker">한계와 확장</p>
+  <h2>아직 안 된 것, 다음에 할 것</h2>
+  <div class="lim">
+    <div class="row">
+      <div class="a">Walrus blob은 공개 — 제출 원문이 노출된다</div>
+      <div class="b">→ <span class="accent">Seal</span>로 원문은 가리고 판정 근거만 공개하는 분리</div>
+    </div>
+    <div class="row">
+      <div class="a">텍스트 증빙은 위조가 쉽다</div>
+      <div class="b">→ 컨트랙트는 "누가 탈락했는가"만 받는다. 증빙 타입은 <span class="accent">교체 가능한 부품</span></div>
+    </div>
+    <div class="row">
+      <div class="a">오라클 권한 제한·회수를 온체인으로 강제하지 못한다</div>
+      <div class="b">→ <span class="mono">submit_results</span>가 <span class="mono">ctx.sender()</span>를 검사하는 구조. 강제하려면 재배포</div>
+    </div>
+    <div class="row">
+      <div class="a">참가자 상태가 shared object 하나에 있다</div>
+      <div class="b">→ 프로토 목표는 정산 수식 검증이었다. <span class="accent">참가자별 객체 분리</span>로 병렬성 확보</div>
+    </div>
+    <div class="row">
+      <div class="a">지갑 UI가 없다</div>
+      <div class="b">→ 참가·예치·판정·정산은 전부 실제 온체인 트랜잭션. UI는 스코프에서 제외</div>
+    </div>
+    <div class="row">
+      <div class="a">LLM 판정은 실행마다 흔들릴 수 있다</div>
+      <div class="b">→ dry-run 명단과 다르면 제출하지 않는다 (<span class="mono">--expect-fail</span>). 되돌릴 수 없는 호출 앞의 안전장치</div>
+    </div>
+  </div>
+</section>
+
+<div class="progress" id="progress"></div>
+<div class="hint">← → 로 이동</div>
+<div class="counter" id="counter"></div>
+
+<script>
+(function () {
+  // ── 환급 커브 (D=5, α=0.2) — 수식에서 직접 그린다 ──
+  var D = 5, A = 0.2;
+  function R(k) { var x = k / D; return A * x + (1 - A) * x * x; }
+  var w = [];
+  for (var d = 1; d <= D; d++) w.push(R(d) - R(d - 1));
+  document.getElementById('ratio5').textContent = (w[D - 1] / w[0]).toFixed(1) + '×';
+
+  var svg = document.getElementById('curve');
+  var NS = 'http://www.w3.org/2000/svg';
+  var L = 56, T = 24, W = 440, H = 300;
+  function el(name, attrs, text) {
+    var e = document.createElementNS(NS, name);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    svg.appendChild(e);
+    return e;
+  }
+  function X(k) { return L + (k / D) * W; }
+  function Y(v) { return T + H - v * H; }
+  [0, 0.25, 0.5, 0.75, 1].forEach(function (v) {
+    el('line', { x1: L, x2: L + W, y1: Y(v), y2: Y(v), stroke: '#2a303c', 'stroke-width': 1 });
+    el('text', { x: L - 10, y: Y(v) + 5, 'text-anchor': 'end', fill: '#8b93a7', 'font-size': 14 }, Math.round(v * 100) + '%');
+  });
+  // 일별 가치 막대
+  for (var i = 0; i < D; i++) {
+    var bw = W / D * 0.56, cx = X(i + 0.5);
+    el('rect', { x: cx - bw / 2, y: Y(w[i]), width: bw, height: w[i] * H, fill: 'rgba(76,141,255,0.28)', rx: 4 });
+  }
+  // 누적 커브
+  var pts = [];
+  for (var s = 0; s <= 100; s++) { var k = s / 100 * D; pts.push(X(k).toFixed(1) + ',' + Y(R(k)).toFixed(1)); }
+  el('polyline', { points: pts.join(' '), fill: 'none', stroke: '#4c8dff', 'stroke-width': 4, 'stroke-linecap': 'round' });
+  for (var k2 = 0; k2 <= D; k2++) {
+    el('circle', { cx: X(k2), cy: Y(R(k2)), r: 5, fill: '#4c8dff' });
+    el('text', { x: X(k2), y: T + H + 24, 'text-anchor': 'middle', fill: '#8b93a7', 'font-size': 14 }, k2);
+  }
+  el('text', { x: L + W / 2, y: T + H + 48, 'text-anchor': 'middle', fill: '#8b93a7', 'font-size': 14 }, '버틴 일수 k  (D = 5, α = 0.2)');
+  el('text', { x: X(D) - 6, y: Y(1) + 22, 'text-anchor': 'end', fill: '#e8eaf0', 'font-size': 15 }, '누적 환급 R(k)');
+  el('text', { x: X(0.5) + 2, y: Y(w[0]) - 10, 'text-anchor': 'middle', fill: '#8b93a7', 'font-size': 13 }, '하루 가치');
+
+  // ── 기억 로드 건수 ──
+  var loads = [0, 3, 6, 9, 11], max = 12;
+  var bars = document.getElementById('bars'), labels = document.getElementById('barLabels');
+  loads.forEach(function (n, i) {
+    var b = document.createElement('div'); b.className = 'bar';
+    b.innerHTML = '<div class="n">' + n + '</div><div class="fill" style="height:' + (n / max * 85) + '%"></div>';
+    bars.appendChild(b);
+    var l = document.createElement('span'); l.textContent = 'day ' + (i + 1); labels.appendChild(l);
+  });
+
+  // ── 슬라이드 전환 ──
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var cur = 0;
+  function show(i) {
+    cur = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach(function (s, j) { s.classList.toggle('active', j === cur); });
+    document.getElementById('counter').textContent = (cur + 1) + ' / ' + slides.length;
+    document.getElementById('progress').style.width = ((cur + 1) / slides.length * 100) + '%';
+    if (location.hash !== '#' + (cur + 1)) history.replaceState(null, '', '#' + (cur + 1));
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); show(cur + 1); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); show(cur - 1); }
+    else if (e.key === 'Home') show(0);
+    else if (e.key === 'End') show(slides.length - 1);
+  });
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('a, button')) return;
+    show(e.clientX > window.innerWidth / 2 ? cur + 1 : cur - 1);
+  });
+  var start = parseInt(location.hash.slice(1), 10);
+  show(isNaN(start) ? 0 : start - 1);
+})();
+</script>
+</body>
+</html>
