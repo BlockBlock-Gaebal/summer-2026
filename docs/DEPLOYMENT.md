@@ -3,6 +3,8 @@
 > **이 파일이 배포 정보의 유일한 정본이다.**
 > 로컬 메모, 카톡, 개인 코드에 적힌 ID는 전부 사본일 뿐이며 이 파일과 다르면 이 파일이 맞다.
 > 재배포 시 규칙: **① 이 파일 갱신 → ② PR → ③ 단톡 통보.** 셋 다 해야 완료.
+>
+> 최종 갱신: 2026-09-20
 
 ---
 
@@ -24,6 +26,10 @@ Package ID
 UpgradeCap (재배포 대신 업그레이드할 때 필요)
 0x3b113944d8f3e3d71c77955cb2b3c5c7fc1a4fc3ddbbce967e0140ece674d410
 ```
+
+> ⚠️ **(2026-09-20 주석) 위 오라클 `0x982fcf2d…`의 키는 현재 WSL 키스토어에 없다.**
+> 2026-09-19 Blockthon 당일 환경 확인에서 드러났다. 이 주소가 오라클인 방①·②에는 더 이상 `submit_results`를 호출할 수 없다.
+> Blockthon의 방⑥~⑧은 새 오라클 `0x1d0bb9ab…`로 만들었다 (아래 "방 ⑥ ~ ⑧" 참조).
 
 패키지는 하나지만 **방(Challenge)은 여러 개 팔 수 있다.** 용도별로 아래에 나눠 적는다.
 헷갈리면 돈이 아니라 시간을 잃는다 — 특히 빈 방에 submit하면 그 방은 영구히 못 쓰게 된다.
@@ -167,6 +173,10 @@ Challenge ID (shared object)
 
 ## 방 ⑤ 발표 실연용 ★ 실연 전까지 손대지 말 것
 
+> 📝 **(2026-09-20 주석) 발표(8/19) 실연 여부·현재 상태 미확인** — 누가 언제 진행했는지 기록이 없다.
+> 아래 표의 PENDING은 2026-08-18 확인 시점의 값이다. 2026-09-20 `read-state` 조회로는 온체인 상태가
+> **ENDED · day 5 / 5 · vault 0.0600 SUI(무claim)** 였다. 발표 실연에서 진행된 것인지는 확인되지 않았다.
+
 D-18(사전 세팅)에 따라 실연용 방은 리허설 방을 재사용하지 않고 새로 판 것이다.
 방④는 리허설로 이미 ENDED가 되어 실연에 쓸 수 없다.
 
@@ -199,6 +209,46 @@ Challenge ID (shared object)
 
 > ⚠️ **실연 전까지 `submit_results`를 호출하지 마라.** 한 번 진행되면 되돌릴 수 없고,
 > PENDING 상태로 복구할 방법이 없다. 리허설·시험은 끝났으니 이 방으로 다시 할 이유가 없다.
+
+---
+
+## 방 ⑥ ~ ⑧ Blockthon 2026 (2026-09-19)
+
+Blockthon 2026 당일에 AI 판정 에이전트(`scripts/agent.ts`)용으로 판 방 셋이다. 패키지는 그대로다 (재배포 없음, D-27).
+기존 오라클 `0x982fcf2d…`의 키가 WSL 키스토어에 없어 **새 오라클 주소로 새 방을 팠다.**
+트랜잭션 다이제스트·Walrus blobId는 `docs/blockthon-2026/BLOCKTHON_STATUS.md` 참조.
+
+공통: `total_days = 5`, `alpha_bp = 2000` (α=0.2), 3인 × 0.02 SUI = vault 0.06 SUI.
+
+```
+오라클 주소 (방⑥~⑧ 공통, = 참가자 A)
+0x1d0bb9ab7409b943d740f21b4cd359387ccb1477fc9d92369e7ae84d54d09249
+
+방 ⑥ Challenge ID — Blockthon 1차 (로컬 기억, 백업)
+0x5ea794e536eccc38f00e8b4d10759236ce8b08afc657dc0d35283a24e2034953
+
+방 ⑦ Challenge ID — Blockthon 발표용 (Walrus 기억)
+0x68295a39ed52b65876aaa0fcc7c84543aaefdfd9c533768f2bd008735b987218
+
+방 ⑧ Challenge ID — Q&A 라이브용
+0x5e6cd1579442041ed2a0c2da9d274df80e074961d6bb78edcc199020f997838f
+```
+
+| 방 | 상태 | 용도 | 취급 |
+|---|---|---|---|
+| ⑥ `0x5ea794e5…` | **ENDED** | Blockthon 1차 — 기억을 로컬 파일에 둔 첫 관통. 발표용 방의 백업 | claim 안 함 |
+| ⑦ `0x68295a39…` | **ENDED** | Blockthon 발표용 — 기억을 Walrus에 두고 3인 5일 완주, dust 0 | **claim 금지. 기준점이라 상태 그대로 보존** |
+| ⑧ `0x5e6cd157…` | **ACTIVE** day 2 / 5 | Q&A 라이브 시연용 | 방치. 더 진행하지 않는다 |
+
+참가자 3인 (방⑥~⑧ 공통):
+
+| 구분 | 주소 | 비고 |
+|---|---|---|
+| A | `0x1d0bb9ab7409b943d740f21b4cd359387ccb1477fc9d92369e7ae84d54d09249` | 오라클 = 방 생성자 (데모 구성) |
+| B | `0xdf8989618416814503a001b5799f8f11059088ac0ba7d9b1b20cf50e6bbee71b` | |
+| C | `0xca849b28f4729eb7dfe03cd6facb35f269e24497816f801ba71de81e424d1bdb` | |
+
+> ⚠️ **방⑦은 claim도 submit도 하지 마라.** 방③(D-27)과 같은 이유다 — Blockthon 검증 결과의 기준점이다.
 
 ---
 
@@ -273,4 +323,11 @@ Your package is already published. You have to manually remove the publication e
 | 2026-08-10 | `0xcc48adc4…` | 검증 / 리허설 | 3인 참여 · PENDING |
 | 2026-08-15 | `0x2f6f1b32…` | 데모용(대시보드 연동 + 오라클 스크립트 실측 검증) | 3인 참여 · ENDED · **검증 기준점, 보존** |
 | 2026-08-17 | `0xe11d8984…` | 통합 리허설(대시보드 폴링 검증) | 3인 참여 · ENDED |
-| 2026-08-18 | `0x7c754bb6…` | 발표 실연용 | 3인 참여 · PENDING · **실연 전 submit 금지** |
+| 2026-08-18 | `0x7c754bb6…` | 발표 실연용 | 3인 참여 · PENDING · **실연 전 submit 금지** *(발표(8/19) 실연 여부·현재 상태 미확인. 09-20 조회 시 온체인은 ENDED — 방⑤ 주석 참조)* |
+| 2026-09-19 | 방⑥ `0x5ea794e5…` | Blockthon 1차(로컬 기억, 백업) | 3인 × 0.02 SUI · ENDED · claim 안 함 |
+| 2026-09-19 | 방⑦ `0x68295a39…` | Blockthon 발표용(Walrus 기억) | 3인 × 0.02 SUI · ENDED · **claim 금지, 기준점** |
+| 2026-09-19 | 방⑧ `0x5e6cd157…` | Q&A 라이브용 | 3인 × 0.02 SUI · ACTIVE day 2/5 · 방치 |
+
+방⑥~⑧의 오라클은 전부 `0x1d0bb9ab7409b943d740f21b4cd359387ccb1477fc9d92369e7ae84d54d09249`다 (방①~② `0x982fcf2d…`, 방③~⑤ `0xb222c9e1…`와 다르다).
+참가자 B `0xdf8989618416814503a001b5799f8f11059088ac0ba7d9b1b20cf50e6bbee71b`, C `0xca849b28f4729eb7dfe03cd6facb35f269e24497816f801ba71de81e424d1bdb`.
+다이제스트는 `docs/blockthon-2026/BLOCKTHON_STATUS.md` 참조.

@@ -11,7 +11,7 @@ Sui Move로 작성한 온체인 정산 프로토콜입니다.
 
 ---
 
-## 2026-09-19 Blockthon 확장 — AI 판정 에이전트
+## 2026-09-19 Blockthon 2026 — AI 판정 에이전트 (완료, 8팀 중 4등)
 
 여름에 비워 둔 판정 레이어를 기억 기반 AI 에이전트로 채웠다. 컨트랙트는 재배포하지 않았다.
 
@@ -21,9 +21,9 @@ Sui Move로 작성한 온체인 정산 프로토콜입니다.
 
 | 문서 | 내용 |
 | --- | --- |
-| `BLOCKTHON.md` | 해커톤 채점 기준과 판단 원칙 |
-| `BLOCKTHON_STATUS.md` | 당일 진행 상황, 방 ID, 다이제스트, blobId |
-| `deck.html` | 발표 덱 |
+| `docs/blockthon-2026/BLOCKTHON.md` | 해커톤 채점 기준과 판단 원칙 |
+| `docs/blockthon-2026/BLOCKTHON_STATUS.md` | 당일 진행 상황, 방 ID, 다이제스트, blobId |
+| `docs/blockthon-2026/deck.html` | 발표 덱 |
 | `scripts/agent.ts` | 판정 에이전트 |
 | `scripts/replay.ts` | Walrus 기억 재생 |
 | `scripts/web/` | 웹 입력 폼 |

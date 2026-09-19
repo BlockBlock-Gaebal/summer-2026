@@ -16,6 +16,7 @@
 | 3자 통합 리허설 | ✅ 완료 — 방④에서 오라클 스크립트 · 대시보드 · CLI를 동시에 띄우고 관통 (D-29) |
 | 마일스톤 1 · 2 · 3 | ✅ 전부 종료 (DECISIONS.md §7) |
 | 발표 | ✅ 완료 |
+| AI 판정 에이전트(`scripts/agent.ts`) | Blockthon에서 첫 구현. 텍스트 증빙 + LLM 판정 + Walrus 기억 |
 
 ### 지금 무엇을 하면 되는가
 
@@ -36,7 +37,7 @@
    - 오라클 · 데모 → `scripts/QUICKSTART.md`
    - 컨트랙트 → `contracts/godsaeng/sources/challenge.move`와 `docs/정산_프로토타입/01_설계문서/` (별도 QUICKSTART 없음)
 
-현재 Blockthon 2026 출품 확장이 진행 중이다. 대회 대응 판단은 **`BLOCKTHON.md`**를 참조하라.
+Blockthon 2026 출품 완료(2026-09-19, 8팀 중 4등). 당시 문서는 **`docs/blockthon-2026/`** 참조.
 
 ---
 
@@ -136,6 +137,7 @@ docs/
 ├─ DEPLOYMENT.md          ★ 배포 ID · 방 목록 (정본)
 ├─ 데모_실행절차.md        데모 시나리오 실행 · 검증 절차
 ├─ PROJECT_CONTEXT.md     배경 · 리서치 · 경쟁 분석 (아카이브)
+├─ blockthon-2026/        Blockthon 2026 출품 문서 · 발표 덱 (아카이브)
 └─ 정산_프로토타입/
    ├─ 01_설계문서/         커브 유도, 명제와 증명, ver4 설계 비교
    ├─ 02_스펙/             PROTO_SPEC — 구현 스펙 (아카이브)
@@ -163,7 +165,7 @@ members/                  팀원 소개
 
 **특정 시점의 기록인 문서는 본문을 고치지 않는다.** 고치면 "그때 무엇을 알고 있었는지"가 사라져 이력이 왜곡된다. 현행과 어긋나는 부분은 **상단 배너로만** 안내한다.
 
-대상: `05_구현로그/`, `02_스펙/PROTO_SPEC.md`, `PROJECT_CONTEXT.md`, `회의/`의 회의록.
+대상: `05_구현로그/`, `02_스펙/PROTO_SPEC.md`, `PROJECT_CONTEXT.md`, `회의/`의 회의록, `blockthon-2026/`.
 
 배너 형식 (내용은 문서별로 조정):
 

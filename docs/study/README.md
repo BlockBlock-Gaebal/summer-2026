@@ -1,7 +1,7 @@
 # docs/study — 비개발자용 학습 자료
 
 > 이 폴더는 Locked In 프로젝트를 **처음 보는 사람(또는 AI 에이전트)** 이 전체 구조를 잡기 위한 설명 페이지다.
-> 설계 결정의 정본은 `docs/DECISIONS.md`, 배포 정보의 정본은 `docs/DEPLOYMENT.md`, 당일 상황은 `BLOCKTHON_STATUS.md`다.
+> 설계 결정의 정본은 `docs/DECISIONS.md`, 배포 정보의 정본은 `docs/DEPLOYMENT.md`, 당일 상황은 `docs/blockthon-2026/BLOCKTHON_STATUS.md`(아카이브)다.
 > 이 폴더의 문서와 정본이 다르면 정본이 맞다.
 
 | 파일 | 내용 | 대상 |
