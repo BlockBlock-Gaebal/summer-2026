@@ -252,9 +252,9 @@
   <p class="kicker">라이브</p>
   <h2>터미널로 전환합니다</h2>
   <div class="term">
-    <div><span class="p">$</span> npx tsx agent.ts 3 --dry-run</div>
-    <div class="muted">Walrus에서 기억 로드: blobId=GvMPYg… (6건)</div>
-    <div class="muted">▶ 0xca849b… 판정: <span style="color:var(--fail)">FAIL</span></div>
+    <div><span class="p">$</span> cd scripts &amp;&amp; npx tsx replay.ts Hiq56TNpx_GIqNYCJoM8-fgrmF2lHZoq4iOGTkAguUg 3</div>
+    <div class="muted">Walrus에서 기억 로드: blobId=Hiq56TNpx_… (9건)</div>
+    <div class="muted">▶ 0xca849b… 과거 기록 2건 로드 (day 1, 2) → 판정: <span style="color:var(--fail)">FAIL</span></div>
     <div><span class="cursor"></span></div>
   </div>
 </section>
@@ -273,12 +273,12 @@
     <div>
       <div class="quote">
         <div class="who">day 3 · 참가자 C · FAIL</div>
-        <div class="what">“Day 1의 내용(조건부확률, 베이즈 정리 유도, 질병 검사 양성 사후확률 계산 5문제)과 사실상 동일한 내용을 재서술한 것으로 판단된다.”</div>
+        <div class="what">“오늘 제출은 Day 1의 내용(조건부확률, 베이즈 정리 유도, 질병 검사 양성 사후확률 계산 5문제)과 사실상 동일한 내용을 재서술한 것으로 판단된다.”</div>
         <div class="src">기억 6건 로드 후 판정 · tx 6s9Gz49d…</div>
       </div>
       <div class="quote">
         <div class="who">day 4 · 참가자 B · FAIL</div>
-        <div class="what">“day 2에서 이미 학습한 교착상태 4가지 필요조건 정리 및 은행원 알고리즘 예제 2개 풀이와 사실상 동일하다.”</div>
+        <div class="what">“오늘 제출 내용은 day 2에서 이미 학습한 교착상태 4가지 필요조건 정리 및 은행원 알고리즘 예제 2개 풀이와 사실상 동일하다. 새로운 학습 내용이 없으므로 인정하지 않는다.”</div>
         <div class="src">기억 9건 로드 후 판정 · tx 8ALZt3Ee…</div>
       </div>
       <p style="margin:0">둘 다 <b>공부 내용으로는 합격</b>이다. 떨어진 이유는 <b class="accent">기억에 있던 과거 제출과의 중복</b> 하나뿐 — 기억이 없으면 통과했을 제출이다.</p>
@@ -340,6 +340,7 @@
       <div class="b">→ dry-run 명단과 다르면 제출하지 않는다 (<span class="mono">--expect-fail</span>). 되돌릴 수 없는 호출 앞의 안전장치</div>
     </div>
   </div>
+  <p class="muted" style="margin-top:2.4vh">데모에서는 오라클이 참가자 A와 동일 주소다 — 실서비스에서는 오라클 키를 참가자와 분리한다.</p>
 </section>
 
 <div class="progress" id="progress"></div>
