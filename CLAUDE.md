@@ -36,6 +36,8 @@
    - 오라클 · 데모 → `scripts/QUICKSTART.md`
    - 컨트랙트 → `contracts/godsaeng/sources/challenge.move`와 `docs/정산_프로토타입/01_설계문서/` (별도 QUICKSTART 없음)
 
+현재 Blockthon 2026 출품 확장이 진행 중이다. 대회 대응 판단은 **`BLOCKTHON.md`**를 참조하라.
+
 ---
 
 ## 1. 한 줄 요약
