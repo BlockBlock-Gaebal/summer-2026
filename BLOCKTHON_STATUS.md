@@ -21,7 +21,7 @@
 | 작업 위치 | WSL `~/blockthon/summer-2026` |
 | 주의 | Windows에는 sui CLI가 없다. 모든 온체인 작업은 WSL에서 한다 |
 | sui | 1.75.2 |
-| node | v24.16.0 |
+| node | v22.22.2 (WSL 기준. Windows는 v24.16.0) |
 | 네트워크 | testnet |
 | 개발 방식 | Claude Code 바이브코딩 |
 
@@ -35,11 +35,12 @@
 | 오라클 = 참가자 A | `0x1d0bb9ab7409b943d740f21b4cd359387ccb1477fc9d92369e7ae84d54d09249` |
 | 참가자 B | `0xdf8989618416814503a001b5799f8f11059088ac0ba7d9b1b20cf50e6bbee71b` |
 | 참가자 C | `0xca849b28f4729eb7dfe03cd6facb35f269e24497816f801ba71de81e424d1bdb` |
-| 1차 방 (백업) | `0x5ea794e536eccc38f00e8b4d10759236ce8b08afc657dc0d35283a24e2034953` |
-| 2차 방 (Walrus 연동) | `0x68295a39ed52b65876aaa0fcc7c84543aaefdfd9c533768f2bd008735b987218` |
+| 1차 방 (백업 방) | `0x5ea794e536eccc38f00e8b4d10759236ce8b08afc657dc0d35283a24e2034953` |
+| 2차 방 (발표용 방, Walrus 연동) | `0x68295a39ed52b65876aaa0fcc7c84543aaefdfd9c533768f2bd008735b987218` |
 
-`docs/DEPLOYMENT.md`에 적힌 오라클 `0x982fcf2d…`의 개인키는 김유안이 보유하고 있어 이번에는 사용하지 못했다.
-`create_challenge`를 호출한 주소가 그 방의 오라클이 되므로, 방을 새로 만들어 해결했다.
+`docs/DEPLOYMENT.md`에는 오라클 `0x982fcf2d…`가 진모의 오라클 주소로 기록되어 있으나,
+WSL 키스토어에서 해당 키를 찾지 못했다. 다른 환경에 있을 가능성이 있다.
+`create_challenge`를 호출한 주소가 그 방의 오라클이 되므로, 방을 새로 만들어 진행했다.
 
 ---
 
@@ -83,10 +84,46 @@ evidence/day{N}.json 읽기
 - blobId는 `scripts/.walrus-memory`에 기록한다.
 - 업로드 직후 읽으면 CDN이 404를 캐싱할 수 있으므로 1초, 2초, 4초 간격으로 3회 재시도한다.
 - 저장은 온체인 제출이 성공한 뒤에만 한다. dry-run 단계에서 저장하면, 재실행할 때 오늘 제출이 과거 기록으로 잡혀 자기 자신과 중복 판정이 난다.
+- **`.walrus-memory`에는 방 구분이 없다.** 새 방을 만들 때는 이 파일을 삭제하고 시작해야 한다. 그대로 두면 이전 방의 기억이 새 방의 판정에 섞인다.
 
 ---
 
-## 5. 1차 시나리오 결과 (백업 방)
+## 5. 시나리오 결과
+
+두 방 모두 같은 파라미터(5일, `alpha_bp = 2000`, 3인 × 0.02 SUI)와 같은 탈락 일정으로 돌렸다.
+
+| 구분 | 방 | 판정 | 기억 저장소 | 용도 |
+| --- | --- | --- | --- | --- |
+| 1차 | 백업 방 `0x5ea794e5…` | day1 더미, day2~5 LLM | 로컬 `memory.json` | 백업. 건드리지 않는다 |
+| 2차 | 발표용 방 `0x68295a39…` | day1~5 전부 LLM | Walrus | 발표 |
+
+### 5-1. 2차 — 발표용 방 (Walrus 연동)
+
+| 단계 | 판정 | 다이제스트 | Walrus blobId (저장 후) |
+| --- | --- | --- | --- |
+| create | | `7VagpPr5byR2LQryUuAt6XDcdQzrQeUCsU8gvqvhZdwm` | |
+| join A | | `8Q5EjQyZU6hdrfDkZpV3PnVnnZbC6mnSA3sn7KBsKr8W` | |
+| join B | | `7kBR6epXTRzmTr5Ausm5akibigMcD51Cn4oEr6W6ewZ8` | |
+| join C | | `CiMh7hsjybePHTWUf7rLt1YXHqQd4R6MU3nTBJmS17BP` | |
+| 1 | 전원 PASS | `2HAPByjpzADiahpFYDk279hj4V2r798tJArQPVsdptNh` | `k_aI1-yeDSTgPb8P6wIYvUEFR1xhF2ptn7zDPQyw8eg` |
+| 2 | 전원 PASS | `E8MpKSw1rS4brLHR4jQYpmqn6QBbsY7rSsJdEJ7E2f8j` | `GvMPYg4VNeN61We_o-HQtM7Kg41GJzekvW3tCWuRo5Y` |
+| 3 | C 중복 FAIL | `6s9Gz49dQaCkTt2qxRQ4DoNBnnddfDHSnRJF4izaDs8a` | `Hiq56TNpx_GIqNYCJoM8-fgrmF2lHZoq4iOGTkAguUg` |
+| 4 | B 중복 FAIL | `8ALZt3EeWi2zELecDs4b53c9DzCaekmUrsbTD94r5FKh` | `_2D5pYcZA9qwX7xxtBQjx1KUvqpPE8cnWU7sRsGIXws` |
+| 5 | A PASS | `9cH2WLQQjbEz7uoHz8KFgHez4myVeTwFBBwRpwmPkRaA` | `xoDph4cl6J9mZjQ9HiL7kMAdJYsGCy7a7CSuT5RBt6Y` |
+| finalize | | `CbzaD8QTpPBptwVKgfqK3UYkw3NUNYVPGS22RscR5HKq` | |
+
+판정 전에 Walrus에서 불러온 기억 건수는 day1~5에 걸쳐 **0 → 3 → 6 → 9 → 11건**으로 늘었다.
+저장 직후마다 다시 읽어 원본과 대조했고 5회 모두 일치했다.
+
+FAIL 근거는 두 건 모두 중복 하나뿐이다.
+
+- day3 C: "Day 1의 내용(조건부확률, 베이즈 정리 유도, 질병 검사 양성 사후확률 계산 5문제)과 사실상 동일한 내용을 재서술한 것으로 판단된다."
+- day4 B: "day 2에서 이미 학습한 교착상태 4가지 필요조건 정리 및 은행원 알고리즘 예제 2개 풀이와 사실상 동일하다."
+
+최종 정산은 1차와 동일하다 (A 45,040,000 / B 10,800,000 / C 4,160,000 MIST, 합계 60,000,000 = vault, **dust 0**, ENDED).
+같은 파라미터와 같은 탈락 일정에서 정산 결과가 결정적으로 재현된 것이다.
+
+### 5-2. 1차 — 백업 방
 
 | day | 판정 | 다이제스트 |
 | --- | --- | --- |
@@ -143,7 +180,7 @@ status는 ENDED이고 dust는 0이다. 아무도 claim하지 않아 vault가 예
 | PR | 내용 |
 | --- | --- |
 | #34 | `BLOCKTHON.md` 추가, `CLAUDE.md`에 포인터 한 줄 |
-| #35 | `feat/ai-agent-judge` — `scripts/agent.ts`, `scripts/evidence/` |
+| #35 | `feat/ai-agent-judge` — `scripts/agent.ts`(Walrus 연동 포함), `scripts/evidence/`, `BLOCKTHON_STATUS.md`(이 문서), `deck.html` |
 
-`scripts/memory.json`과 `scripts/.env`는 `.gitignore` 대상이다.
+`scripts/memory.json`, `scripts/.walrus-memory`, `scripts/.env`는 `.gitignore` 대상이다.
 `contracts/`와 `docs/DEPLOYMENT.md`는 이번 작업에서 수정하지 않았다.
