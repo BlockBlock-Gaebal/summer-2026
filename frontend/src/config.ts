@@ -8,6 +8,6 @@ export const PACKAGE_ID =
 
 export const CHALLENGE_ID =
   new URLSearchParams(location.search).get('challenge')
-  ?? '0xe11d89849787da8a028e515a17f2615ecf52da8d75415cbe983daa04f68bc4eb';
+  ?? '0x68295a39ed52b65876aaa0fcc7c84543aaefdfd9c533768f2bd008735b987218';
 
 export const POLL_INTERVAL = 5000;
