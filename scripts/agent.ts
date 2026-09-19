@@ -36,11 +36,13 @@
  *   npx tsx agent.ts 1          # day 지정 (체인의 다음 day와 다르면 중단)
  *   npx tsx agent.ts --dry-run  # 판정 + CLI dry-run까지만, 체인·Walrus 기억에 반영하지 않음
  *   npx tsx agent.ts 3 --expect-fail=0xC...   # 이번 판정의 FAIL 명단이 이것과 다르면 제출 안 함
+ *   npx tsx agent.ts 1 --interactive --dry-run # evidence/day1.json이 없으면 터미널에서 받아 만든 뒤 진행
  */
 
 import { readState, createSuiClient, humanizeError, shortAddress, STATUS } from './read_state';
 import type { ChallengeSnapshot } from './read_state';
 import { execFileSync } from 'node:child_process';
+import { createInterface } from 'node:readline';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -266,6 +268,33 @@ function loadEvidence(day: number): Evidence[] {
   });
 }
 
+/**
+ * --interactive: 생존 참가자마다 터미널에서 오늘 한 일을 한 줄씩 받아 evidence/day{N}.json을 만든다.
+ * 이후는 파일이 원래 있던 것과 완전히 같은 경로를 탄다 (loadEvidence가 다시 읽고 검증한다).
+ */
+async function collectEvidenceInteractively(day: number, addresses: string[]): Promise<void> {
+  // rl.question()은 파이프 입력(printf ... | agent.ts)에서 줄을 흘리므로, 줄을 버퍼링하는 async iterator로 읽는다.
+  const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: process.stdin.isTTY === true });
+  const lines = rl[Symbol.asyncIterator]();
+  console.log(`\n═══ day ${day} 증빙 입력 (${addresses.length}명) ═══`);
+  console.log('오늘 한 일을 한 줄로 적고 Enter. 비워 두면 FAIL로 판정된다.');
+  const evidence: Evidence[] = [];
+  try {
+    for (const address of addresses) {
+      process.stdout.write(`${address}: 오늘 한 일? `);
+      const next = await lines.next();
+      if (next.done) throw new Error('입력이 끊겼다 (stdin 종료). 증빙 파일을 만들지 않았다.');
+      if (!process.stdin.isTTY) console.log(next.value); // 파이프 입력이면 받은 줄을 화면에도 남긴다
+      evidence.push({ address, text: next.value.trim() });
+    }
+  } finally {
+    rl.close();
+  }
+  const file = join(EVIDENCE_DIR, `day${day}.json`);
+  writeFileSync(file, JSON.stringify(evidence, null, 2) + '\n');
+  console.log(`evidence/day${day}.json 생성 (${evidence.length}건)`);
+}
+
 /** sui CLI 실행. 실패하면 stderr를 붙여 던진다. */
 function sui(args: string[]): string {
   try {
@@ -295,6 +324,7 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run');
   const allowWipeout = args.includes('--allow-wipeout');
+  const interactive = args.includes('--interactive');
   const dayArg = args.find((a) => !a.startsWith('--'));
   const expectFail = args.find((a) => a.startsWith('--expect-fail='))?.slice('--expect-fail='.length);
 
@@ -325,6 +355,12 @@ async function main(): Promise<void> {
   }
 
   // ── 2. 증빙 읽기 + 명단 대조 ──
+  const alive = before.participants.filter((p) => p.failedDay === 0n);
+  // --interactive: 증빙 파일이 없으면 터미널에서 생존자별로 받아 파일을 만든 뒤 기존 흐름으로 이어간다.
+  // 파일이 이미 있으면 묻지 않는다 (판정 로직과는 무관한 입력 단계).
+  if (interactive && !existsSync(join(EVIDENCE_DIR, `day${day}.json`))) {
+    await collectEvidenceInteractively(day, alive.map((p) => p.address));
+  }
   const evidence = loadEvidence(day);
   const byAddress = new Map(evidence.map((e) => [e.address, e]));
   const participants = new Map(before.participants.map((p) => [p.address.toLowerCase(), p]));
@@ -332,7 +368,6 @@ async function main(): Promise<void> {
   for (const e of evidence) {
     if (!participants.has(e.address)) throw new Error(`증빙의 ${shortAddress(e.address)}는 이 방의 참가자가 아니다.`);
   }
-  const alive = before.participants.filter((p) => p.failedDay === 0n);
   const missing = alive.filter((p) => !byAddress.has(p.address.toLowerCase()));
   if (missing.length > 0) {
     throw new Error(`생존 참가자의 증빙이 없다: ${missing.map((p) => shortAddress(p.address)).join(', ')}`);

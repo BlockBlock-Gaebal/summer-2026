@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Locked In — 오늘의 인증</title>
+<style>
+  :root { --bg:#0d0f14; --panel:#161a22; --line:#2a303c; --text:#e8eaf0; --muted:#8b93a7; --accent:#ff8a3d; --blue:#4c8dff; --pass:#3ecf8e; --fail:#ff5c5c;
+          --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; padding: 28px 20px 60px; }
+  main { max-width: 900px; margin: 0 auto; display:grid; gap:20px; }
+  h1 { margin:0; font-size: 26px; letter-spacing:-0.01em; }
+  .sub { color:var(--muted); font-family:var(--mono); font-size: 13px; }
+  .status { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .pill { border:1px solid var(--line); border-radius:999px; padding:4px 12px; font-size:13px; color:var(--muted); }
+  .pill b { color:var(--text); }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 18px; }
+  .row { display:grid; grid-template-columns: 150px 1fr; gap: 12px; align-items:start; padding: 10px 0; border-top:1px solid var(--line); }
+  .row:first-child { border-top:0; padding-top:0; }
+  .who { font-family:var(--mono); font-size:13px; color:var(--muted); padding-top:9px; }
+  .who b { display:block; color:var(--text); font-family:system-ui, sans-serif; font-size:15px; }
+  textarea { width:100%; min-height:64px; background:#0b0d12; color:var(--text); border:1px solid var(--line); border-radius:8px; padding:9px 11px; font: 15px/1.5 system-ui, sans-serif; resize:vertical; }
+  textarea:focus { outline:2px solid var(--accent); outline-offset:1px; border-color:transparent; }
+  textarea:disabled { opacity:0.45; }
+  .out { color:var(--fail); font-size:13px; padding-top:9px; }
+  .actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  button { font: 600 15px system-ui, sans-serif; padding: 10px 18px; border-radius:8px; border:1px solid var(--line); background:#20252f; color:var(--text); cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#1a0e05; }
+  button.danger { background:transparent; border-color:var(--fail); color:var(--fail); }
+  button:disabled { opacity:0.45; cursor:not-allowed; }
+  .hint { color:var(--muted); font-size:13px; }
+  pre#log { margin:0; background:#07080b; border:1px solid var(--line); border-radius:12px; padding:14px 16px; min-height: 220px; max-height: 60vh; overflow:auto; font: 13px/1.55 var(--mono); white-space:pre-wrap; word-break:break-all; color:var(--text); }
+  .l-pass { color:var(--pass); font-weight:700; } .l-fail { color:var(--fail); font-weight:700; } .l-err { color:var(--fail); } .l-dim { color:var(--muted); } .l-walrus { color:var(--blue); } .l-head { color:var(--accent); font-weight:700; }
+  .banner { border-left:4px solid var(--fail); background:rgba(255,92,92,0.08); padding:10px 14px; border-radius:0 8px 8px 0; font-size:14px; }
+  @media (max-width: 640px) { .row { grid-template-columns: 1fr; } .who { padding-top:0; } }
+</style>
+</head>
+<body>
+<main>
+  <div>
+    <h1>Locked In — 오늘의 인증</h1>
+    <div class="sub" id="room">방 정보를 읽는 중…</div>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <div class="card" id="form"></div>
+
+  <div class="actions">
+    <button class="primary" id="btnDry" disabled>판정 (dry-run)</button>
+    <button class="danger" id="btnSubmit" disabled>실제 제출</button>
+    <span class="hint" id="hint">dry-run은 체인에 아무것도 쓰지 않는다. 실제 제출은 되돌릴 수 없다.</span>
+  </div>
+
+  <pre id="log">(판정 로그가 여기 실시간으로 뜬다)</pre>
+</main>
+
+<script>
+(function () {
+  var state = null, busy = false;
+  var $ = function (id) { return document.getElementById(id); };
+
+  function short(a) { return a.slice(0, 8) + '…' + a.slice(-4); }
+
+  function render() {
+    var st = state;
+    $('room').textContent = '방 ' + st.challengeId;
+    $('status').innerHTML =
+      '<span class="pill">상태 <b>' + st.status + '</b></span>' +
+      '<span class="pill">진행 <b>day ' + st.currentDay + ' / ' + st.totalDays + '</b></span>' +
+      '<span class="pill">이번 판정 <b>day ' + st.nextDay + '</b></span>' +
+      '<span class="pill">생존 <b>' + st.participants.filter(function (p) { return p.alive; }).length + '명</b></span>';
+    var html = '';
+    st.participants.forEach(function (p, i) {
+      var label = ['A', 'B', 'C', 'D', 'E'][i] || ('#' + (i + 1));
+      html += '<div class="row"><div class="who"><b>' + label + (p.address.toLowerCase() === st.oracle.toLowerCase() ? ' · 오라클' : '') + '</b>' + short(p.address) + '</div>';
+      if (p.alive) html += '<textarea id="t-' + p.address + '" placeholder="오늘 공부한 내용을 구체적으로 — 비워 두면 FAIL"></textarea>';
+      else html += '<div class="out">day ' + p.failedDay + ' 탈락 — 판정 대상 아님</div>';
+      html += '</div>';
+    });
+    if (!st.canJudge) html = '<div class="banner">이 방은 ' + st.status + ' 상태라 더 판정할 수 없다. scripts/.env의 CHALLENGE_ID를 확인.</div>' + html;
+    $('form').innerHTML = html;
+    $('btnDry').disabled = !st.canJudge || busy;
+    $('btnSubmit').disabled = !st.canJudge || busy;
+  }
+
+  function loadState() {
+    return fetch('/state').then(function (r) { return r.json(); }).then(function (s) { state = s; render(); })
+      .catch(function (e) { $('room').textContent = '방 정보를 읽지 못했다: ' + e; });
+  }
+
+  function classify(line) {
+    if (/판정: PASS/.test(line)) return 'l-pass';
+    if (/판정: FAIL|FAIL 명단|^\s+- 0x/.test(line)) return 'l-fail';
+    if (/Walrus|blobId/.test(line)) return 'l-walrus';
+    if (/^═══|^\$ /.test(line)) return 'l-head';
+    if (/^\s*\(/.test(line) || /^규칙:/.test(line)) return 'l-dim';
+    return '';
+  }
+  function append(line, cls) {
+    var log = $('log');
+    var span = document.createElement('span');
+    span.className = cls || classify(line);
+    span.textContent = line + '\n';
+    log.appendChild(span);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function run(mode) {
+    if (busy || !state) return;
+    if (mode === 'submit' && !confirm('day ' + state.nextDay + ' 판정 결과를 체인에 실제로 제출한다.\n되돌릴 수 없다. 계속할까?')) return;
+    var texts = {};
+    state.participants.forEach(function (p) { if (p.alive) texts[p.address] = ($('t-' + p.address) || {}).value || ''; });
+    busy = true; render();
+    $('log').textContent = '';
+    append('[' + new Date().toLocaleTimeString() + '] ' + (mode === 'submit' ? '실제 제출' : 'dry-run') + ' 시작', 'l-head');
+
+    fetch('/judge', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ texts: texts, mode: mode }) })
+      .then(function (r) {
+        if (!r.ok) return r.text().then(function (t) { throw new Error(r.status + ' ' + t); });
+        var reader = r.body.getReader(), dec = new TextDecoder(), buf = '';
+        function pump() {
+          return reader.read().then(function (res) {
+            if (res.done) return;
+            buf += dec.decode(res.value, { stream: true });
+            var parts = buf.split('\n\n'); buf = parts.pop();
+            parts.forEach(function (block) {
+              var ev = (block.match(/^event: (.*)$/m) || [])[1], data = (block.match(/^data: (.*)$/m) || [])[1];
+              if (!ev) return;
+              var text = JSON.parse(data);
+              if (ev === 'done') append('── 종료 (exit ' + text + ')', text === '0' ? 'l-pass' : 'l-err');
+              else append(text, ev === 'err' ? 'l-err' : undefined);
+            });
+            return pump();
+          });
+        }
+        return pump();
+      })
+      .catch(function (e) { append('오류: ' + e.message, 'l-err'); })
+      .then(function () { busy = false; return loadState(); });
+  }
+
+  $('btnDry').addEventListener('click', function () { run('dry-run'); });
+  $('btnSubmit').addEventListener('click', function () { run('submit'); });
+  loadState();
+})();
+</script>
+</body>
+</html>

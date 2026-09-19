@@ -11,7 +11,8 @@
     "read-state": "tsx read_state.ts",
     "seed": "tsx seed.ts",
     "submit": "tsx submit.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "web": "tsx web/server.ts"
   },
   "dependencies": {
     "@mysten/sui": "^1.30.0",
