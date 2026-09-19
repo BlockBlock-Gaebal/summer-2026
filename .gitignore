@@ -21,4 +21,6 @@ dist/
 scripts/.demo-state.json
 # agent.ts의 판정 기억. 참가자 제출 원문이 들어가므로 커밋 안 함
 scripts/memory.json
+# agent.ts가 가리키는 최신 기억 blobId. 로컬 상태이고 방 구분이 없다
+scripts/.walrus-memory
 .venv/

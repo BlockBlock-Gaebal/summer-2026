@@ -1,16 +1,18 @@
 /**
  * agent.ts — 증빙(evidence) → LLM 판정 → submit_results 온체인 제출 (오라클 전용)
  *
- * 흐름: evidence/day{N}.json 읽기 → memory.json에서 참가자별 과거 기록 로드
+ * 흐름: evidence/day{N}.json 읽기 → Walrus에서 참가자별 과거 기록(기억) 로드
  *       → Claude가 규칙 + 과거 기록 + 오늘 제출로 PASS/FAIL 판정 → FAIL 주소 배열
  *       → `sui client ptb`로 submit_results 호출 → 다이제스트 출력 → day 반영 확인
- *       → 제출이 성공한 경우에만 오늘 판정을 memory.json에 append
+ *       → 제출이 성공한 경우에만 오늘 판정을 기억에 append해 Walrus에 새 blob으로 저장
  *
  * 판정: Anthropic Messages API를 fetch로 직접 호출한다. 키는 process.env.ANTHROPIC_API_KEY
  * 에서만 읽고 어디에도 출력하지 않는다. 응답이 {"verdict","reason"} JSON으로 파싱되지 않으면
  * FAIL로 처리하지 않고 **에러로 중단**한다 — 파싱 실패로 누군가를 탈락시키면 되돌릴 수 없다.
  *
- * 기억: memory.json = { "0x주소": [{ day, text, verdict, reason }] }. 프롬프트에는 오늘보다
+ * 기억: { "0x주소": [{ day, text, verdict, reason }] } JSON을 Walrus blob으로 저장한다.
+ * 최신 blobId는 scripts/.walrus-memory에 적고, 로드는 aggregator에서 그 blobId로 읽는다.
+ * 저장할 때마다 새 blob이 생기므로 day별 blobId가 곧 그날까지의 기억 스냅샷이다. 프롬프트에는 오늘보다
  * 이전 day의 기록만 넣는다. dry-run이나 제출 실패 때는 쓰지 않는다 — 쓰고 나서 재실행하면
  * 오늘 제출이 "과거 기록"으로 잡혀 자기 자신과 중복 판정되기 때문이다.
  *
@@ -32,7 +34,7 @@
  * 사용법 (scripts/ 에서):
  *   npx tsx agent.ts            # 체인의 current_day + 1 에 해당하는 증빙을 읽어 제출
  *   npx tsx agent.ts 1          # day 지정 (체인의 다음 day와 다르면 중단)
- *   npx tsx agent.ts --dry-run  # 판정 + CLI dry-run까지만, 체인·memory.json에 반영하지 않음
+ *   npx tsx agent.ts --dry-run  # 판정 + CLI dry-run까지만, 체인·Walrus 기억에 반영하지 않음
  *   npx tsx agent.ts 3 --expect-fail=0xC...   # 이번 판정의 FAIL 명단이 이것과 다르면 제출 안 함
  */
 
@@ -45,7 +47,14 @@ import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const EVIDENCE_DIR = join(__dirname, 'evidence');
-const MEMORY_FILE = join(__dirname, 'memory.json');
+// 기억 blob의 최신 blobId를 적어 두는 포인터 파일. 기억 본문은 Walrus에 있다.
+const WALRUS_POINTER_FILE = join(__dirname, '.walrus-memory');
+// Walrus 업로드가 실패했을 때만 쓰는 로컬 백업 (gitignore 대상)
+const MEMORY_BACKUP_FILE = join(__dirname, 'memory.json');
+const WALRUS_PUBLISHER = 'https://publisher.walrus-testnet.walrus.space';
+const WALRUS_AGGREGATOR = 'https://aggregator.walrus-testnet.walrus.space';
+const WALRUS_EPOCHS = 5;
+const WALRUS_RETRIES = 3;
 const GAS_BUDGET = '50000000';
 
 const MODEL = 'claude-sonnet-4-6';
@@ -73,13 +82,76 @@ interface MemoryRecord extends Judgment {
 
 type Memory = Record<string, MemoryRecord[]>;
 
-function loadMemory(): Memory {
-  if (!existsSync(MEMORY_FILE)) return {};
-  return JSON.parse(readFileSync(MEMORY_FILE, 'utf-8')) as Memory;
+function countRecords(memory: Memory): number {
+  return Object.values(memory).reduce((n, rs) => n + rs.length, 0);
 }
 
-function saveMemory(memory: Memory): void {
-  writeFileSync(MEMORY_FILE, JSON.stringify(memory, null, 2) + '\n');
+/** 1s, 2s, 4s 백오프로 재시도. 마지막 시도까지 실패하면 그 에러를 던진다. */
+async function withRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (attempt > WALRUS_RETRIES) throw e;
+      const wait = 1000 * 2 ** (attempt - 1);
+      console.log(`  (${label} 실패, ${wait / 1000}s 후 재시도 ${attempt}/${WALRUS_RETRIES}: ${(e as Error).message})`);
+      await sleep(wait);
+    }
+  }
+}
+
+async function fetchMemoryBlob(blobId: string): Promise<Memory> {
+  return withRetry('Walrus GET', async () => {
+    // 업로드 직후엔 aggregator/CDN이 아직 blob을 못 찾아 404를 줄 수 있다 → 재시도 대상
+    const res = await fetch(`${WALRUS_AGGREGATOR}/v1/blobs/${encodeURIComponent(blobId)}`, {
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return JSON.parse(await res.text()) as Memory;
+  });
+}
+
+/**
+ * Walrus에서 기억 로드. 포인터 파일이 없으면 빈 기억으로 시작한다.
+ * 포인터가 있는데 읽지 못하면 **빈 기억으로 넘어가지 않고 throw** — 기억 없이 판정하면
+ * 중복 재제출이 전부 PASS로 통과해 버린다.
+ */
+async function loadMemory(): Promise<Memory> {
+  const blobId = existsSync(WALRUS_POINTER_FILE) ? readFileSync(WALRUS_POINTER_FILE, 'utf-8').trim() : '';
+  if (!blobId) {
+    console.log('Walrus에서 기억 로드: blobId=(없음) — 빈 기억으로 시작 (0건)');
+    return {};
+  }
+  const memory = await fetchMemoryBlob(blobId);
+  console.log(`Walrus에서 기억 로드: blobId=${blobId} (${countRecords(memory)}건)`);
+  return memory;
+}
+
+/** Walrus에 기억 저장 → 포인터 파일 갱신 → 다시 읽어 왕복 검증. */
+async function saveMemory(memory: Memory): Promise<string> {
+  const body = JSON.stringify(memory);
+  const blobId = await withRetry('Walrus PUT', async () => {
+    const res = await fetch(`${WALRUS_PUBLISHER}/v1/blobs?epochs=${WALRUS_EPOCHS}`, {
+      method: 'PUT',
+      body,
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    const r = (await res.json()) as {
+      newlyCreated?: { blobObject?: { blobId?: string } };
+      alreadyCertified?: { blobId?: string };
+    };
+    const id = r.newlyCreated?.blobObject?.blobId ?? r.alreadyCertified?.blobId;
+    if (!id) throw new Error(`응답에 blobId가 없다: ${JSON.stringify(r).slice(0, 200)}`);
+    return id;
+  });
+  writeFileSync(WALRUS_POINTER_FILE, blobId + '\n');
+  console.log(`Walrus에 기억 저장: blobId=${blobId}`);
+
+  const readBack = await fetchMemoryBlob(blobId);
+  if (JSON.stringify(readBack) !== body) throw new Error(`Walrus 왕복 검증 실패: blobId=${blobId}`);
+  console.log(`  왕복 검증 통과 (${countRecords(readBack)}건)`);
+  return blobId;
 }
 
 const SYSTEM_PROMPT = [
@@ -267,7 +339,7 @@ async function main(): Promise<void> {
   }
 
   // ── 3. 판정 (기억 로드 → LLM) ──
-  const memory = loadMemory();
+  const memory = await loadMemory();
   console.log(`\n═══ day ${day} 판정 (${MODEL}) ═══`);
   console.log(`규칙: ${RULE}`);
   const failed: string[] = [];
@@ -320,7 +392,7 @@ async function main(): Promise<void> {
   if (!/execution status: success/.test(dry)) throw new Error(`dry-run 실패:\n${dry}`);
   console.log('dry-run 통과');
   if (dryRun) {
-    console.log('--dry-run 이라 여기서 멈춘다. 체인과 memory.json에는 반영되지 않았다.\n');
+    console.log('--dry-run 이라 여기서 멈춘다. 체인과 Walrus 기억에는 반영되지 않았다.\n');
     return;
   }
 
@@ -338,8 +410,16 @@ async function main(): Promise<void> {
   for (const { address, record } of judged) {
     memory[address] = [...(memory[address] ?? []).filter((r) => r.day !== day), record];
   }
-  saveMemory(memory);
-  console.log(`memory.json 갱신 (${judged.length}명, day ${day})`);
+  try {
+    await saveMemory(memory);
+  } catch (e) {
+    // 체인은 이미 day가 넘어갔다. 기억을 잃으면 다음 날 중복 판정이 불가능하므로 로컬에 백업하고 크게 알린다.
+    writeFileSync(MEMORY_BACKUP_FILE, JSON.stringify(memory, null, 2) + '\n');
+    throw new Error(
+      `submit_results는 성공했지만(digest ${result.digest}) Walrus 저장에 실패했다: ${(e as Error).message}\n` +
+        `기억은 scripts/memory.json에 백업했다. 다음 day 실행 전에 Walrus에 다시 올리고 .walrus-memory를 갱신할 것.`,
+    );
+  }
 
   // ── 6. 반영 확인 (풀노드 읽기 지연이 있어 짧게 재조회 — submit.ts의 pollSnapshot과 같은 이유) ──
   let after: ChallengeSnapshot = await readState(client, challengeId);
