@@ -1,0 +1,373 @@
+<title>Locked In 코드 해부</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #f3f4f7; --panel: #ffffff; --ink: #1c2130; --muted: #667085; --line: #dfe2ea;
+    --chain: #2f5fd0; --chain-bg: #e8eefc; --ai: #d8672a; --ai-bg: #fbeadf;
+    --read: #5b7a99; --read-bg: #e9eff5;
+    --pass: #1f8f5f; --pass-bg: #e2f4ea; --fail: #c8362f; --fail-bg: #fbe4e2;
+    --code-bg: #1b1f29; --code-ink: #e6e9f0; --code-cm: #8b95ab; --code-kw: #ffb072; --code-str: #9fd8a9;
+    --note-bg: #fff7dc; --note-line: #e9d48a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151c; --panel: #1b1f29; --ink: #e9ecf3; --muted: #98a2b8; --line: #2c3241;
+      --chain: #7fa1ff; --chain-bg: #1d2a4a; --ai: #ff9a5c; --ai-bg: #45291a; --read: #9db4cc; --read-bg: #222c38;
+      --pass: #4fd39a; --pass-bg: #163526; --fail: #ff7b74; --fail-bg: #45201f;
+      --code-bg: #0d1017; --note-bg: #3a3218; --note-line: #7a672c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12151c; --panel: #1b1f29; --ink: #e9ecf3; --muted: #98a2b8; --line: #2c3241;
+    --chain: #7fa1ff; --chain-bg: #1d2a4a; --ai: #ff9a5c; --ai-bg: #45291a; --read: #9db4cc; --read-bg: #222c38;
+    --pass: #4fd39a; --pass-bg: #163526; --fail: #ff7b74; --fail-bg: #45201f;
+    --code-bg: #0d1017; --note-bg: #3a3218; --note-line: #7a672c;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif; font-size: 16px; line-height: 1.65; padding-block: 40px 80px; padding-inline: 20px; }
+  main { max-width: 820px; margin: 0 auto; display: grid; gap: 56px; }
+  h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 8px; text-wrap: balance; }
+  h2 { font-size: 1.35rem; margin: 0 0 14px; text-wrap: balance; }
+  h3 { font-size: 1.05rem; margin: 22px 0 8px; }
+  p { margin: 0 0 12px; max-width: 68ch; }
+  .eyebrow { font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 500; margin-bottom: 6px; }
+  .lead { font-size: 1.1rem; max-width: 62ch; }
+  code, .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 0.88em; }
+  p code, li code, td code, dd code { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+  pre { background: var(--code-bg); color: var(--code-ink); border-radius: 12px; padding: 16px 18px; overflow-x: auto; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.82rem; line-height: 1.6; margin: 10px 0 16px; }
+  pre .cm { color: var(--code-cm); } pre .kw { color: var(--code-kw); } pre .str { color: var(--code-str); }
+  .tag { display: inline-block; font-size: 0.75rem; padding: 2px 9px; border-radius: 999px; font-weight: 500; vertical-align: middle; }
+  .tag.chain { background: var(--chain-bg); color: var(--chain); } .tag.ai { background: var(--ai-bg); color: var(--ai); } .tag.read { background: var(--read-bg); color: var(--read); }
+  .tag.pass { background: var(--pass-bg); color: var(--pass); } .tag.fail { background: var(--fail-bg); color: var(--fail); }
+  .note { background: var(--note-bg); border: 1px solid var(--note-line); border-radius: 10px; padding: 12px 16px; margin: 14px 0; } .note p { margin: 0; }
+  .figure { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; overflow-x: auto; }
+  .figure svg { display: block; min-width: 700px; width: 100%; height: auto; }
+  .caption { font-size: 0.85rem; color: var(--muted); margin-top: 10px; }
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; font-size: 0.8rem; } tr:last-child td { border-bottom: 0; }
+  td.num { font-family: "IBM Plex Mono", monospace; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  ol, ul { padding-left: 1.3em; margin: 0 0 12px; max-width: 68ch; } li { margin-bottom: 6px; }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 0; font-size: 0.95rem; } dt { font-weight: 700; font-family: "IBM Plex Mono", monospace; font-size: 0.85rem; } dd { margin: 0; }
+  @media (max-width: 560px) { dl { grid-template-columns: 1fr; gap: 2px 0; } dd { margin-bottom: 10px; color: var(--muted); } }
+  .steps { counter-reset: s; display: grid; gap: 10px; }
+  .step { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px 12px 52px; position: relative; }
+  .step::before { counter-increment: s; content: counter(s); position: absolute; left: 14px; top: 12px; width: 26px; height: 26px; border-radius: 50%; background: var(--ai-bg); color: var(--ai); font-weight: 700; font-size: 0.85rem; display: grid; place-items: center; }
+  .step.chain::before { background: var(--chain-bg); color: var(--chain); }
+  .step b { display: block; margin-bottom: 2px; } .step .where { font-family: "IBM Plex Mono", monospace; font-size: 0.78rem; color: var(--muted); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 0.85rem; color: var(--muted); margin-top: 10px; }
+  .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+  .mermaid { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; overflow-x: auto; }
+</style>
+
+<main>
+
+<header>
+  <div class="eyebrow">Locked In · 기술 구조</div>
+  <h1>코드는 실제로 어떻게 돌아가는가</h1>
+  <p class="lead">앞선 해부도가 "누가 무엇을 하는가"였다면, 이 페이지는 <b>어떤 프로그램이, 어떤 통신으로, 어떤 데이터를 주고받으며, 어떤 계산을 하는가</b>입니다. 코드 조각은 전부 저장소에 실제로 있는 것을 그대로 가져왔고, 옆에 무슨 뜻인지 붙였습니다.</p>
+  <div class="legend">
+    <span><i class="sw" style="background:var(--ai)"></i>오프체인 심판 (TypeScript · Node)</span>
+    <span><i class="sw" style="background:var(--chain)"></i>온체인 (Move · Sui)</span>
+    <span><i class="sw" style="background:var(--read)"></i>읽기 전용 (대시보드 · 조회 스크립트)</span>
+  </div>
+</header>
+
+<!-- 1. 계층 -->
+<section>
+  <div class="eyebrow">1 · 계층 구조</div>
+  <h2>네 개의 층, 세 종류의 통신</h2>
+  <div class="figure">
+    <svg viewBox="0 0 900 470" role="img" aria-label="입력, 오프체인 심판, 온체인, 읽기 계층과 그 사이의 통신 방식">
+      <defs><marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+      <g font-family="IBM Plex Sans KR, sans-serif" font-size="13" fill="var(--ink)">
+        <!-- 층 배경 -->
+        <rect x="20" y="20" width="860" height="70" rx="10" fill="var(--panel)" stroke="var(--line)"/>
+        <text x="36" y="46" font-weight="700">입력 (파일)</text>
+        <text x="36" y="70" font-family="IBM Plex Mono, monospace" font-size="12">scripts/evidence/day3.json  — [{ "address": "0x…", "text": "오늘 공부한 내용" }, …]</text>
+
+        <rect x="20" y="110" width="860" height="150" rx="10" fill="var(--ai-bg)" stroke="var(--ai)" stroke-width="2"/>
+        <text x="36" y="136" font-weight="700">오프체인 심판 — Node.js 22 · TypeScript (tsx로 바로 실행)</text>
+        <rect x="36" y="150" width="200" height="90" rx="8" fill="var(--panel)" stroke="var(--line)"/>
+        <text x="136" y="176" text-anchor="middle" font-weight="700" font-family="IBM Plex Mono, monospace" font-size="12">agent.ts</text>
+        <text x="136" y="196" text-anchor="middle" font-size="12">읽기 → 판정 → 제출 → 저장</text>
+        <text x="136" y="216" text-anchor="middle" font-size="12">모든 순서를 여기서 지휘</text>
+        <rect x="270" y="150" width="180" height="90" rx="8" fill="var(--panel)" stroke="var(--line)"/>
+        <text x="360" y="176" text-anchor="middle" font-weight="700">Anthropic API</text>
+        <text x="360" y="196" text-anchor="middle" font-size="12">HTTPS · JSON</text>
+        <text x="360" y="216" text-anchor="middle" font-size="12" font-family="IBM Plex Mono, monospace">POST /v1/messages</text>
+        <rect x="484" y="150" width="180" height="90" rx="8" fill="var(--panel)" stroke="var(--line)"/>
+        <text x="574" y="176" text-anchor="middle" font-weight="700">Walrus</text>
+        <text x="574" y="196" text-anchor="middle" font-size="12">HTTP · 파일 통째로</text>
+        <text x="574" y="216" text-anchor="middle" font-size="12" font-family="IBM Plex Mono, monospace">PUT /v1/blobs · GET /v1/blobs/{id}</text>
+        <rect x="698" y="150" width="166" height="90" rx="8" fill="var(--panel)" stroke="var(--line)"/>
+        <text x="781" y="176" text-anchor="middle" font-weight="700">sui CLI</text>
+        <text x="781" y="196" text-anchor="middle" font-size="12">자식 프로세스로 실행</text>
+        <text x="781" y="216" text-anchor="middle" font-size="12">키스토어의 키로 서명</text>
+
+        <rect x="20" y="280" width="860" height="90" rx="10" fill="var(--chain-bg)" stroke="var(--chain)" stroke-width="2"/>
+        <text x="36" y="306" font-weight="700">온체인 — Sui Testnet · Move 컨트랙트 (godsaeng::challenge)</text>
+        <text x="36" y="330" font-size="12">Challenge = shared object 하나 (금고 Balance, 참가자 Table, 날짜·상태·누적배당 지표)</text>
+        <text x="36" y="352" font-size="12" font-family="IBM Plex Mono, monospace">create_challenge · join · withdraw · submit_results · finalize · claim</text>
+
+        <rect x="20" y="390" width="860" height="60" rx="10" fill="var(--read-bg)" stroke="var(--read)" stroke-width="2"/>
+        <text x="36" y="416" font-weight="700">읽기 — 대시보드(React) · read_state.ts</text>
+        <text x="36" y="438" font-size="12">gRPC-web으로 풀노드에서 오브젝트 JSON을 읽는다 (JSON-RPC는 폐지됨). 쓰기는 없다.</text>
+
+        <!-- 화살표 -->
+        <g style="color:var(--muted)" stroke="currentColor" stroke-width="2" fill="none">
+          <path d="M136,90 L136,150" marker-end="url(#a2)"/>
+          <path d="M236,195 L270,195" marker-end="url(#a2)"/>
+          <path d="M450,195 L484,195" marker-end="url(#a2)" marker-start="url(#a2)"/>
+          <path d="M664,195 L698,195" marker-end="url(#a2)"/>
+          <path d="M781,240 L781,280" marker-end="url(#a2)"/>
+          <path d="M450,370 L450,390" marker-end="url(#a2)"/>
+        </g>
+        <text x="790" y="262" fill="var(--muted)" font-size="11">트랜잭션 전송</text>
+        <text x="458" y="384" fill="var(--muted)" font-size="11">5초마다 조회</text>
+      </g>
+    </svg>
+    <div class="caption">에이전트는 체인에 직접 붙지 않습니다. <code>sui client ptb</code>라는 공식 명령줄 도구를 자식 프로세스로 띄워 "이 함수를 이 인자로 호출해 줘"라고 시키고, 서명은 CLI가 자기 키스토어로 합니다. 그래서 개인키가 코드나 <code>.env</code>에 없습니다.</div>
+  </div>
+</section>
+
+<!-- 2. 데이터 구조 -->
+<section>
+  <div class="eyebrow">2 · 데이터 구조</div>
+  <h2>체인 위에 실제로 저장된 것</h2>
+  <p>방 하나가 <b>shared object</b> 하나입니다. "shared"는 특정 지갑 소유가 아니라 누구나 트랜잭션에서 참조할 수 있다는 뜻이고, 여러 사람이 <code>join</code>해야 하니 이 형태여야 합니다. 아래는 컨트랙트의 실제 정의입니다.</p>
+<pre><span class="kw">public struct</span> Challenge <span class="kw">has key</span> {
+    id: UID,
+    oracle: address,        <span class="cm">// 탈락자 명단을 제출할 수 있는 유일한 지갑 (= 방 만든 사람)</span>
+    alpha_bp: u64,          <span class="cm">// 환급 커브의 α. 2000 = 0.2 (basis point)</span>
+    total_days: u64,        <span class="cm">// D = 5</span>
+    current_day: u64,       <span class="cm">// 0에서 시작, submit_results마다 +1</span>
+    daily_drip: u64,        <span class="cm">// 하루에 생존자에게 흘려보낼 몰수액 합계 (MIST)</span>
+    acc_per_share: u128,    <span class="cm">// "stake 1 MIST당 누적 배당" ×1e12. 배당 계산의 핵심 지표</span>
+    vault: Balance&lt;SUI&gt;,    <span class="cm">// 금고. 예치금이 전부 여기 있다</span>
+    participants: Table&lt;address, Participant&gt;,   <span class="cm">// 주소 → 참가자 정보</span>
+    participant_list: vector&lt;address&gt;,           <span class="cm">// Table은 순회가 안 돼서 순서 목록을 따로 둔다</span>
+    status: u8,             <span class="cm">// 0 PENDING · 1 ACTIVE · 2 ENDED</span>
+}
+
+<span class="kw">public struct</span> Participant <span class="kw">has store</span> {
+    stake: u64,             <span class="cm">// 건 돈 (20,000,000 MIST)</span>
+    start_day: u64,         <span class="cm">// 참여 시작일 (시작 전 참여 = 1)</span>
+    acc_entry: u128,        <span class="cm">// 참여 시점의 acc_per_share 스냅샷 — 내 몫 계산의 기준점</span>
+    failed_day: u64,        <span class="cm">// 0 = 생존, n = day n에 탈락</span>
+    claimable: u64,         <span class="cm">// 찾아갈 수 있는 금액. finalize 후 확정</span>
+}</pre>
+  <div class="note"><p><b>왜 Coin이 아니라 Balance인가?</b> Coin은 지갑 속에 낱개로 굴러다니는 "동전 객체"이고, Balance는 다른 객체 안에 품어 두는 "잔액"입니다. 금고처럼 내부에 보관할 땐 Balance가 정석입니다. <code>join</code>은 참가자가 준 Coin을 잔액으로 바꿔 vault에 합치고, <code>claim</code>은 vault에서 떼어내 다시 Coin으로 만들어 돌려줍니다.</p></div>
+
+  <h3>오프체인 쪽 데이터 3종</h3>
+  <div class="tablewrap"><table>
+    <tr><th>파일</th><th>모양</th><th>누가 쓰고 누가 읽나</th></tr>
+    <tr><td><code>evidence/day3.json</code></td><td><code>[{ "address": "0x…", "text": "…" }, …]</code></td><td>사람이 쓰고 agent.ts가 읽음 (입력)</td></tr>
+    <tr><td>Walrus blob (기억)</td><td><code>{ "0x주소": [{ "day": 1, "text": "…", "verdict": "PASS", "reason": "…" }, …] }</code></td><td>agent.ts가 매일 새로 쓰고 다음 날 읽음. 공개</td></tr>
+    <tr><td><code>scripts/.walrus-memory</code></td><td>blobId 한 줄</td><td>가장 최근 기억 덩어리를 가리키는 포인터. 로컬 전용</td></tr>
+  </table></div>
+  <p style="margin-top:12px">Walrus는 덮어쓰기가 없습니다. 저장할 때마다 새 blob(새 blobId)이 생기므로, <b>day별 blobId가 곧 그날까지 기억의 스냅샷</b>이 됩니다. Day 3 판정 때 읽은 blob은 <code>GvMPYg…</code>(6건), 판정 후 저장한 blob은 <code>Hiq56T…</code>(9건)입니다.</p>
+</section>
+
+<!-- 3. 상태 기계 -->
+<section>
+  <div class="eyebrow">3 · 방의 상태 변화</div>
+  <h2>어떤 호출이 어떤 상태에서만 허용되는가</h2>
+  <pre class="mermaid">
+stateDiagram-v2
+    [*] --> PENDING : create_challenge(5, 2000)
+    PENDING --> PENDING : join / withdraw (철회 가능)
+    PENDING --> ACTIVE : submit_results 첫 호출 (돈 잠김)
+    ACTIVE --> ACTIVE : submit_results ×4 (day 2~5)
+    ACTIVE --> ENDED : finalize (day == 5)
+    ACTIVE --> ENDED : 생존자 0명 (전멸, 조기 종료)
+    ENDED --> ENDED : claim (각자 찾아감)
+  </pre>
+  <p>컨트랙트는 각 함수 첫머리에서 <code>assert!</code>로 상태를 검사합니다. 조건이 틀리면 트랜잭션 전체가 <b>abort</b>되어 아무 일도 일어나지 않고, 에러 코드만 남습니다 (<code>EJoinClosed</code>, <code>ENotOracle</code>, <code>EAllDaysSubmitted</code> …). 에이전트가 dry-run으로 먼저 돌려보는 것은 이 abort를 공짜로 확인하기 위해서입니다.</p>
+</section>
+
+<!-- 4. submit_results 내부 -->
+<section>
+  <div class="eyebrow">4 · 핵심 함수 하나 뜯어보기</div>
+  <h2><code>submit_results</code>가 호출되면 컨트랙트 안에서 벌어지는 일</h2>
+  <p>에이전트가 하루에 한 번 부르는 함수입니다. 인자는 방과 탈락자 주소 목록뿐. 나머지는 전부 컨트랙트가 계산합니다.</p>
+  <div class="steps">
+    <div class="step chain"><b>권한·상태 검사</b><span class="where">assert!(ctx.sender() == ch.oracle) · status != ENDED · current_day &lt; total_days</span>보낸 지갑이 오라클이 아니면 즉시 abort.</div>
+    <div class="step chain"><b>PENDING이면 ACTIVE로, 날짜 +1</b><span class="where">ch.current_day = ch.current_day + 1</span>첫 제출 순간부터 withdraw가 막힙니다.</div>
+    <div class="step chain"><b>탈락자마다: 탈락일 기록 → 지금까지 쌓인 배당 확정 → 몰수액을 남은 날에 균등 분할해 drip에 더함</b><span class="where">p.failed_day = d · p.claimable += pending_dividend(…) · ch.daily_drip += (stake − refund) / (D − d + 1)</span>배당은 "갱신 전 acc"로 정산해서, 그날 탈락자는 그날 배당을 못 받습니다.</div>
+    <div class="step chain"><b>오늘 생존자의 지분 합계</b><span class="where">participant_list를 돌며 failed_day == 0인 stake를 합산</span>Table은 순회가 안 되므로 vector를 따로 들고 다니는 이유가 여기 있습니다.</div>
+    <div class="step chain"><b>생존자가 0이면 전멸 처리(ENDED), 아니면 지표 갱신</b><span class="where">acc_per_share += daily_drip × 1e12 / survivor_stake_sum</span>개인별로 돌며 더하지 않고, 지표 하나만 올립니다 (O(1)).</div>
+  </div>
+
+  <h3>acc_per_share — "개인별로 안 돌고도 정확히 나누는" 트릭</h3>
+  <p>DeFi에서 흔히 쓰는 패턴(MasterChef 방식)입니다. "챌린지 시작부터 지금까지 stake 1 MIST가 받았어야 할 배당 누적치"를 하나의 숫자로 관리하고, 각자는 <b>참여 시점의 값(acc_entry)과 정산 시점의 값의 차이 × 내 stake</b>로 자기 몫을 구합니다. 실제 방의 숫자로 따라가면:</p>
+  <div class="tablewrap"><table>
+    <tr><th>시점</th><th>daily_drip</th><th>생존자 stake 합</th><th>acc_per_share 증가분</th><th>누적 acc (×1e12)</th></tr>
+    <tr><td>Day 1·2</td><td class="num">0</td><td class="num">60,000,000</td><td class="num">0</td><td class="num">0</td></tr>
+    <tr><td>Day 3 (C 탈락)</td><td class="num">5,280,000</td><td class="num">40,000,000</td><td class="num">0.132</td><td class="num">0.132</td></tr>
+    <tr><td>Day 4 (B 탈락)</td><td class="num">11,200,000</td><td class="num">20,000,000</td><td class="num">0.560</td><td class="num">0.692</td></tr>
+    <tr><td>Day 5</td><td class="num">11,200,000</td><td class="num">20,000,000</td><td class="num">0.560</td><td class="num">1.252</td></tr>
+  </table></div>
+  <p style="margin-top:12px">B는 Day 4에 탈락하며 "갱신 전 acc" 0.132로 정산 → 20,000,000 × 0.132 = <b>2,640,000</b>. A는 finalize에서 1.252로 정산 → 20,000,000 × 1.252 = <b>25,040,000</b>, 여기에 원금 20,000,000을 더해 45,040,000. 체인에 실제로 기록된 값과 정확히 같습니다.</p>
+
+  <h3>환급 공식을 정수로만 계산하는 법</h3>
+  <p>Move에는 소수가 없습니다. 그래서 <code>R(k) = α·(k/D) + (1−α)·(k/D)²</code>를 통분해 나눗셈을 맨 마지막 한 번만 합니다.</p>
+<pre><span class="kw">public fun</span> calc_refund(stake: u64, d: u64, total_days: u64, alpha_bp: u64): u64 {
+    <span class="kw">let</span> k = <span class="kw">if</span> (d == 0) { 0 } <span class="kw">else</span> { d - 1 };          <span class="cm">// 탈락일 d → 버틴 일수 k</span>
+    <span class="kw">let</span> numer = (stake <span class="kw">as</span> u128)
+        * ((alpha_bp <span class="kw">as</span> u128) * (k <span class="kw">as</span> u128) * (total_days <span class="kw">as</span> u128)
+            + ((10000 - alpha_bp) <span class="kw">as</span> u128) * (k <span class="kw">as</span> u128) * (k <span class="kw">as</span> u128));
+    <span class="kw">let</span> denom = 10000 * (total_days <span class="kw">as</span> u128) * (total_days <span class="kw">as</span> u128);
+    (numer / denom) <span class="kw">as</span> u64
+}</pre>
+  <p>C의 경우: stake 20,000,000, k = 2, D = 5, α = 2000 → 20,000,000 × (2000·2·5 + 8000·4) / (10000·25) = 20,000,000 × 52,000 / 250,000 = <b>4,160,000</b>. u128로 계산하는 이유는 곱셈 중간값이 u64 한계(약 1.8×10¹⁹)에 닿기 때문입니다.</p>
+</section>
+
+<!-- 5. 시퀀스 -->
+<section>
+  <div class="eyebrow">5 · 하루치 실행 순서</div>
+  <h2><code>npx tsx agent.ts 3</code> 한 줄이 일으키는 통신</h2>
+  <pre class="mermaid">
+sequenceDiagram
+    participant A as agent.ts
+    participant S as Sui 풀노드 (gRPC)
+    participant W as Walrus
+    participant C as Claude API
+    participant CLI as sui CLI
+    A->>S: readState(challengeId)
+    S-->>A: day 2/5, ACTIVE, 참가자 3명
+    A->>A: evidence/day3.json 읽기, 명단 대조
+    A->>W: GET /v1/blobs/GvMPYg…
+    W-->>A: 기억 6건
+    loop 생존 참가자 3명
+        A->>C: POST /v1/messages (규칙 + 과거 기록 + 오늘 글)
+        C-->>A: {"verdict":"FAIL","reason":"…"}
+    end
+    A->>CLI: sui client ptb … submit_results … --dry-run
+    CLI-->>A: execution status: success
+    A->>CLI: sui client ptb … submit_results … --json
+    CLI->>S: 서명된 트랜잭션 전송
+    S-->>CLI: digest 6s9Gz49d…
+    CLI-->>A: JSON (digest, status)
+    A->>W: PUT /v1/blobs?epochs=5 (기억 9건)
+    W-->>A: blobId Hiq56T…
+    A->>W: GET /v1/blobs/Hiq56T… (왕복 검증)
+    A->>S: readState 재조회 → day 3/5
+  </pre>
+  <p>순서가 중요합니다. <b>기억 저장은 트랜잭션 성공 뒤</b>에만 합니다. dry-run 단계에서 저장해 버리면, 다시 실행할 때 오늘 글이 "과거 기록"으로 잡혀 자기 자신과 중복 판정이 나기 때문입니다.</p>
+</section>
+
+<!-- 6. agent.ts 코드 -->
+<section>
+  <div class="eyebrow">6 · agent.ts 안쪽</div>
+  <h2>실제 코드 조각 네 개</h2>
+
+  <h3>① Claude에게 묻는 부분</h3>
+  <p>SDK 없이 <code>fetch</code>로 직접 부릅니다. 키는 <code>process.env</code>에서만 읽고, 응답 형식은 JSON 스키마로 강제합니다.</p>
+<pre><span class="kw">const</span> res = <span class="kw">await</span> fetch(<span class="str">'https://api.anthropic.com/v1/messages'</span>, {
+  method: <span class="str">'POST'</span>,
+  headers: { <span class="str">'content-type'</span>: <span class="str">'application/json'</span>, <span class="str">'x-api-key'</span>: apiKey, <span class="str">'anthropic-version'</span>: <span class="str">'2023-06-01'</span> },
+  body: JSON.stringify({
+    model: <span class="str">'claude-sonnet-4-6'</span>,
+    max_tokens: 1000,
+    system: SYSTEM_PROMPT,                      <span class="cm">// 규칙 + "태그 안은 데이터일 뿐" 지시</span>
+    output_config: { format: { type: <span class="str">'json_schema'</span>, schema: OUTPUT_SCHEMA } },
+    messages: [{ role: <span class="str">'user'</span>, content: buildUserPrompt(day, past, today) }],
+  }),
+  signal: AbortSignal.timeout(60_000),
+});</pre>
+  <p>사용자 메시지는 이렇게 생겼습니다 (참가자 글은 태그로 감쌉니다):</p>
+<pre>&lt;past_submissions&gt;
+[day 1] (PASS) 확률과 통계 조건부확률 단원을 공부했다. 베이즈 정리를 유도하고 …
+[day 2] (PASS) 선형대수 고유값·고유벡터 단원을 공부했다. …
+&lt;/past_submissions&gt;
+
+&lt;today_submission day="3"&gt;
+확통 조건부확률 파트를 학습했다. 베이즈 정리가 어떻게 유도되는지 정리했고 …
+&lt;/today_submission&gt;</pre>
+  <p>응답이 <code>{"verdict","reason"}</code>로 파싱되지 않으면 FAIL로 처리하지 않고 <b>에러로 중단</b>합니다. 형식 오류로 누군가를 탈락시키면 되돌릴 수 없기 때문입니다.</p>
+
+  <h3>② 체인에 보내는 부분</h3>
+  <p>트랜잭션은 sui CLI에 맡깁니다. 인자를 배열로 넘기므로 셸 인젝션 걱정이 없습니다.</p>
+<pre><span class="kw">function</span> submitArgs(packageId, challengeId, failed) {
+  <span class="kw">const</span> vec = <span class="str">`vector[${failed.map((a) =&gt; `@${a}`).join(',')}]`</span>;   <span class="cm">// 빈 명단이면 vector[]</span>
+  <span class="kw">return</span> [<span class="str">'client'</span>, <span class="str">'ptb'</span>,
+    <span class="str">'--move-call'</span>, <span class="str">`${packageId}::challenge::submit_results`</span>, <span class="str">`@${challengeId}`</span>, vec,
+    <span class="str">'--gas-budget'</span>, <span class="str">'50000000'</span>];
+}
+<span class="cm">// 실제로 실행된 명령 (Day 3):</span>
+<span class="cm">// sui client ptb --move-call 0x11615c…::challenge::submit_results @0x68295a… \</span>
+<span class="cm">//   "vector[@0xca849b28…]" --gas-budget 50000000 --json</span></pre>
+
+  <h3>③ Walrus에 저장하는 부분</h3>
+<pre><span class="kw">const</span> res = <span class="kw">await</span> fetch(<span class="str">`${WALRUS_PUBLISHER}/v1/blobs?epochs=5`</span>, { method: <span class="str">'PUT'</span>, body });
+<span class="kw">const</span> r = <span class="kw">await</span> res.json();
+<span class="kw">const</span> id = r.newlyCreated?.blobObject?.blobId ?? r.alreadyCertified?.blobId;  <span class="cm">// 응답 모양이 둘</span>
+writeFileSync(<span class="str">'.walrus-memory'</span>, id + <span class="str">'\n'</span>);
+<span class="kw">const</span> readBack = <span class="kw">await</span> fetchMemoryBlob(id);        <span class="cm">// 바로 다시 읽어 원본과 비교</span>
+<span class="kw">if</span> (JSON.stringify(readBack) !== body) <span class="kw">throw new</span> Error(<span class="str">'Walrus 왕복 검증 실패'</span>);</pre>
+  <p>같은 내용을 다시 올리면 Walrus는 새로 만들지 않고 <code>alreadyCertified</code>로 기존 blobId를 돌려줍니다. 그래서 두 경우를 모두 받습니다. 읽기는 1초·2초·4초 간격으로 3번 재시도합니다 (업로드 직후 404가 날 수 있어서).</p>
+
+  <h3>④ 멈추는 조건들 — 코드 위치</h3>
+  <div class="tablewrap"><table>
+    <tr><th>검사</th><th>agent.ts 줄</th><th>어떻게</th></tr>
+    <tr><td>방이 ENDED / 참가자 0명 / 날짜 다 참</td><td class="num">315–320</td><td>체인 상태를 읽은 직후 throw</td></tr>
+    <tr><td>요청한 day ≠ 체인의 다음 day</td><td class="num">322–325</td><td><code>Number(dayArg) !== currentDay + 1</code></td></tr>
+    <tr><td>방 밖 주소 · 중복 주소 · 생존자 글 누락</td><td class="num">244–267, 332–339</td><td>정규식으로 주소 검증, Map으로 대조</td></tr>
+    <tr><td>LLM 응답 형식 불량</td><td class="num">191–203, 237–239</td><td>파싱·enum·stop_reason 검사 후 throw</td></tr>
+    <tr><td>예상 명단과 다름 (<code>--expect-fail</code>)</td><td class="num">368–374</td><td>길이와 원소 대조</td></tr>
+    <tr><td>전원 FAIL (전멸)</td><td class="num">376–378</td><td><code>--allow-wipeout</code> 없으면 throw</td></tr>
+    <tr><td>서명 지갑 ≠ 오라클</td><td class="num">381–387</td><td><code>sui client active-address</code>와 체인의 oracle 비교</td></tr>
+    <tr><td>CLI dry-run 실패</td><td class="num">391–392</td><td>출력에 "execution status: success" 없으면 throw</td></tr>
+  </table></div>
+</section>
+
+<!-- 7. 읽기 쪽 -->
+<section>
+  <div class="eyebrow">7 · 읽기 쪽</div>
+  <h2>대시보드는 체인을 어떻게 읽나</h2>
+  <p>Sui 공개 풀노드의 JSON-RPC가 폐지되어(설계 결정 D-23) <b>gRPC-web</b>으로 읽습니다. 함정이 하나 있는데, 참가자 정보가 들어 있는 <code>Table</code>은 Sui에서 <b>dynamic field</b>로 저장되어 오브젝트를 그냥 읽으면 껍데기와 개수만 나옵니다. 그래서 두 단계로 읽습니다.</p>
+  <div class="steps">
+    <div class="step" style="--x:0"><b>Challenge 오브젝트 읽기</b><span class="where">ledgerService.getObject({ readMask: ['json'] })</span>oracle, current_day, vault, status, participants Table의 id와 size가 나옵니다.</div>
+    <div class="step"><b>Table의 dynamic field ID 목록</b><span class="where">stateService.listDynamicFields({ parent: tableId })</span>참가자 수만큼의 필드 ID. 1,000개 단위로 페이지를 넘깁니다.</div>
+    <div class="step"><b>필드 오브젝트 하나씩 읽기</b><span class="where">각 필드 = { name: "0x주소", value: { stake, start_day, acc_entry, failed_day, claimable } }</span>이 로직이 <code>scripts/read_state.ts</code>에 있고, 대시보드도 같은 파일을 복사해 씁니다.</div>
+  </div>
+  <p style="margin-top:12px">대시보드(<code>frontend/src/App.tsx</code>)는 <code>setInterval(loadState, 5000)</code>으로 5초마다 이 읽기를 반복합니다. 조회에 실패하면 마지막으로 성공한 화면을 유지하고 실패 횟수만 셉니다. 진행 중인 방에서는 <code>acc_per_share</code>로 "지금 claim하면 얼마"를 프론트에서 미리 계산해 보여 주고(<code>dividend.ts</code>는 컨트랙트의 <code>pending_dividend</code>를 연산 순서까지 똑같이 미러링), ENDED면 체인에 확정된 claimable을 그대로 씁니다.</p>
+</section>
+
+<!-- 8. 왜 이렇게 -->
+<section>
+  <div class="eyebrow">8 · 설계 선택의 이유</div>
+  <h2>심사위원이 "왜?"라고 물을 만한 것들</h2>
+  <div class="tablewrap"><table>
+    <tr><th>선택</th><th>이유</th></tr>
+    <tr><td>개인키를 파일에 두지 않고 sui CLI로 서명</td><td>키가 코드·환경변수·로그 어디에도 안 나타난다. 에이전트는 "무엇을 보낼지"만 정하고, "누구 이름으로"는 CLI 키스토어가 정한다.</td></tr>
+    <tr><td>돈을 컨트랙트가 보내주지 않고 각자 claim (pull 패턴)</td><td>일괄 송금 루프는 참가자 수에 비례해 비싸지고 한 명 실패가 전체를 막는다. 각자 찾아가면 실패가 격리된다.</td></tr>
+    <tr><td>Table + vector 이중 관리</td><td>Table은 O(1) 조회는 되지만 순회가 안 된다. 정산 때 전원을 돌아야 하므로 주소 목록을 따로 든다.</td></tr>
+    <tr><td>acc_per_share 지표 하나로 배당</td><td>매일 참가자 전원을 돌며 더하면 O(n). 지표 하나만 올리면 O(1)이고, 중도 참여자의 "진입 전 배당 제외"가 뺄셈으로 자동 보장된다.</td></tr>
+    <tr><td>나눗셈은 마지막 한 번, u128 누적</td><td>정수 연산의 절단 오차를 최소화. 실측 dust 0의 배경.</td></tr>
+    <tr><td>LLM 출력을 JSON 스키마로 강제 + 파싱 실패는 에러</td><td>판정이 온체인 집행으로 이어지므로 "애매하면 FAIL"이 아니라 "애매하면 멈춤"이어야 한다.</td></tr>
+    <tr><td>기억을 로컬이 아니라 Walrus에</td><td>판정 근거가 에이전트 밖에, 공개 검증 가능한 곳에 남는다. blobId 하나로 누구나 같은 기억을 재생할 수 있다 (<code>replay.ts</code>).</td></tr>
+    <tr><td>gRPC로 읽기</td><td>공개 풀노드의 JSON-RPC가 2026-08에 폐지됐다. 선택이 아니라 필수.</td></tr>
+  </table></div>
+</section>
+
+<!-- 9. 도구 -->
+<section>
+  <div class="eyebrow">9 · 사용한 기술 목록</div>
+  <h2>이름만 들어도 뭔지 알게</h2>
+  <dl>
+    <dt>Move</dt><dd>Sui 컨트랙트 언어. 돈을 "리소스"로 다뤄서, 받은 코인을 어딘가에 넣지 않으면 컴파일이 안 된다 (증발 불가).</dd>
+    <dt>Sui Testnet</dt><dd>연습용 체인. 패키지 <code>0x11615c…</code>가 8월에 배포됐고 이후 재배포 없음.</dd>
+    <dt>TypeScript + Node 22 + tsx</dt><dd>심판 프로그램 언어와 실행기. tsx는 컴파일 없이 .ts 파일을 바로 실행해 준다.</dd>
+    <dt>@mysten/sui (gRPC)</dt><dd>Sui 공식 JS 라이브러리. 여기서는 읽기에만 사용.</dd>
+    <dt>sui CLI 1.75.2</dt><dd>공식 명령줄 도구. 키 보관·서명·트랜잭션 전송·dry-run을 담당.</dd>
+    <dt>Anthropic Messages API</dt><dd>Claude를 부르는 HTTP API. 모델 <code>claude-sonnet-4-6</code>, JSON 스키마 출력.</dd>
+    <dt>Walrus HTTP API</dt><dd>publisher에 PUT, aggregator에서 GET. 테스트넷 공개 엔드포인트 사용.</dd>
+    <dt>React + Vite</dt><dd>대시보드. <code>?challenge=방ID</code>로 보는 방을 바꾼다.</dd>
+    <dt>dotenv</dt><dd><code>.env</code> 파일의 값을 환경변수로 올려 주는 작은 라이브러리. 실행 위치가 <code>scripts/</code>여야 한다.</dd>
+  </dl>
+</section>
+
+</main>
