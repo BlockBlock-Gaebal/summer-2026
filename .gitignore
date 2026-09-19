@@ -19,4 +19,8 @@ dist/
 # --- 데모 스크립트 로컬 상태 ---
 # seed.ts가 만든 유안 소유 데모 방 ID. 팀 공용 값이 아니라 재실행용 로컬 캐시라 커밋 안 함
 scripts/.demo-state.json
+# agent.ts의 판정 기억. 참가자 제출 원문이 들어가므로 커밋 안 함
+scripts/memory.json
+# agent.ts가 가리키는 최신 기억 blobId. 로컬 상태이고 방 구분이 없다
+scripts/.walrus-memory
 .venv/
