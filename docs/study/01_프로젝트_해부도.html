@@ -1,0 +1,341 @@
+<title>Locked In 해부도</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #f3f4f7;
+    --panel: #ffffff;
+    --ink: #1c2130;
+    --muted: #667085;
+    --line: #dfe2ea;
+    --chain: #2f5fd0;        /* 여름에 만든 것 · 체인 쪽 */
+    --chain-bg: #e8eefc;
+    --ai: #d8672a;           /* 오늘 만든 것 · AI 쪽 */
+    --ai-bg: #fbeadf;
+    --pass: #1f8f5f;
+    --pass-bg: #e2f4ea;
+    --fail: #c8362f;
+    --fail-bg: #fbe4e2;
+    --note-bg: #fff7dc;
+    --note-line: #e9d48a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151c; --panel: #1b1f29; --ink: #e9ecf3; --muted: #98a2b8; --line: #2c3241;
+      --chain: #7fa1ff; --chain-bg: #1d2a4a; --ai: #ff9a5c; --ai-bg: #45291a;
+      --pass: #4fd39a; --pass-bg: #163526; --fail: #ff7b74; --fail-bg: #45201f;
+      --note-bg: #3a3218; --note-line: #7a672c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12151c; --panel: #1b1f29; --ink: #e9ecf3; --muted: #98a2b8; --line: #2c3241;
+    --chain: #7fa1ff; --chain-bg: #1d2a4a; --ai: #ff9a5c; --ai-bg: #45291a;
+    --pass: #4fd39a; --pass-bg: #163526; --fail: #ff7b74; --fail-bg: #45201f;
+    --note-bg: #3a3218; --note-line: #7a672c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    font-size: 16px; line-height: 1.65;
+    padding-block: 40px 80px; padding-inline: 20px;
+  }
+  main { max-width: 780px; margin: 0 auto; display: grid; gap: 56px; }
+  h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 8px; text-wrap: balance; }
+  h2 { font-size: 1.35rem; margin: 0 0 14px; text-wrap: balance; }
+  h3 { font-size: 1.05rem; margin: 22px 0 8px; }
+  p { margin: 0 0 12px; max-width: 66ch; }
+  .eyebrow { font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 500; margin-bottom: 6px; }
+  .lead { font-size: 1.1rem; max-width: 60ch; }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 0.9em; }
+  .tag { display: inline-block; font-size: 0.75rem; padding: 2px 9px; border-radius: 999px; font-weight: 500; vertical-align: middle; }
+  .tag.chain { background: var(--chain-bg); color: var(--chain); }
+  .tag.ai { background: var(--ai-bg); color: var(--ai); }
+  .tag.pass { background: var(--pass-bg); color: var(--pass); }
+  .tag.fail { background: var(--fail-bg); color: var(--fail); }
+  .note { background: var(--note-bg); border: 1px solid var(--note-line); border-radius: 10px; padding: 12px 16px; margin: 14px 0; }
+  .note p { margin: 0; }
+  .figure { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; overflow-x: auto; }
+  .figure svg { display: block; min-width: 720px; width: 100%; height: auto; }
+  .caption { font-size: 0.85rem; color: var(--muted); margin-top: 10px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 0.85rem; color: var(--muted); margin-top: 10px; }
+  .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  /* 등장인물 */
+  .cast { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+  .cast .who { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; border-top: 4px solid var(--line); }
+  .cast .who.chain { border-top-color: var(--chain); }
+  .cast .who.ai { border-top-color: var(--ai); }
+  .cast .who b { display: block; font-size: 1rem; margin-bottom: 4px; }
+  .cast .who span { font-size: 0.9rem; color: var(--muted); }
+
+  /* 타임라인 */
+  .days { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .day { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 0.85rem; }
+  .day b { display: block; font-size: 0.95rem; margin-bottom: 6px; }
+  .day .p { display: flex; justify-content: space-between; padding: 2px 0; border-top: 1px dashed var(--line); }
+  .day .p:first-of-type { border-top: 0; }
+  @media (max-width: 640px) { .days { grid-template-columns: 1fr 1fr; } }
+
+  /* 돈 막대 */
+  .money { display: grid; gap: 10px; }
+  .money .row { display: grid; grid-template-columns: 5.5em 1fr 9em; align-items: center; gap: 12px; font-size: 0.92rem; }
+  .money .bar { height: 26px; border-radius: 6px; display: flex; overflow: hidden; background: var(--line); }
+  .money .seg { height: 100%; }
+  .money .num { font-family: "IBM Plex Mono", monospace; text-align: right; font-variant-numeric: tabular-nums; }
+  @media (max-width: 480px) { .money .row { grid-template-columns: 4.5em 1fr; } .money .num { grid-column: 2; text-align: left; } }
+
+  /* 파일 지도 */
+  .tree { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.85rem; line-height: 1.7; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; overflow-x: auto; }
+  .tree div { white-space: nowrap; }
+  .tree .d { color: var(--muted); }
+  .tree .c { color: var(--muted); font-family: "IBM Plex Sans KR", sans-serif; font-size: 0.85rem; }
+
+  /* 용어 */
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 18px; margin: 0; }
+  dt { font-weight: 700; }
+  dd { margin: 0; color: var(--ink); }
+  @media (max-width: 520px) { dl { grid-template-columns: 1fr; gap: 2px 0; } dd { margin-bottom: 10px; color: var(--muted); } }
+
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; font-size: 0.8rem; }
+  tr:last-child td { border-bottom: 0; }
+  .tablewrap { overflow-x: auto; }
+  ol, ul { padding-left: 1.3em; margin: 0 0 12px; max-width: 66ch; }
+  li { margin-bottom: 6px; }
+  a { color: var(--chain); }
+</style>
+
+<main>
+
+<header>
+  <div class="eyebrow">Locked In (갓생 내기) · Blockthon 2026</div>
+  <h1>이 프로젝트는 어떻게 굴러가는가</h1>
+  <p class="lead">돈을 걸고 매일 공부를 인증하는 내기입니다. <b>AI가 심판</b>을 보고, <b>블록체인이 금고</b>를 지킵니다. 개발을 몰라도 읽을 수 있게, 등장인물 → 흐름 → 하루 → 돈 → 파일 → 용어 순서로 풀었습니다.</p>
+  <div class="legend">
+    <span><i class="sw" style="background:var(--chain)"></i>여름에 만든 것 (체인·정산·대시보드)</span>
+    <span><i class="sw" style="background:var(--ai)"></i>해커톤 당일 만든 것 (입력·기억·판정)</span>
+  </div>
+</header>
+
+<!-- 1. 한 문장 -->
+<section>
+  <div class="eyebrow">1 · 한 문장으로</div>
+  <h2>세 명이 각자 0.02 SUI를 걸고, 5일 동안 매일 "오늘 공부한 것"을 글로 낸다</h2>
+  <p>AI가 그 글을 읽고 <span class="tag pass">PASS</span> 또는 <span class="tag fail">FAIL</span>을 매깁니다. FAIL이면 그날 탈락하고, 건 돈의 일부만 돌려받습니다. 잃은 돈은 <b>살아남은 사람들에게 나눠집니다</b>. 끝까지 버틴 사람이 가장 많이 가져갑니다.</p>
+  <p>핵심은 두 가지입니다. ① 돈은 회사가 아니라 <b>컨트랙트(자동 금고)</b>가 쥔다. ② 판정은 사람이 아니라 <b>기억을 가진 AI</b>가 근거를 적어 가며 한다.</p>
+  <div class="note"><p><b>왜 "기억"이 중요한가?</b> 규칙이 "어제 낸 걸 표현만 바꿔 또 내면 불인정"이기 때문입니다. AI가 과거 제출을 기억하지 못하면, 같은 글을 매일 내도 전부 통과합니다. 그래서 AI의 기억을 <b>Walrus</b>라는 공개 저장소에 두었습니다.</p></div>
+</section>
+
+<!-- 2. 등장인물 -->
+<section>
+  <div class="eyebrow">2 · 등장인물</div>
+  <h2>누가 무엇을 하는가</h2>
+  <div class="cast">
+    <div class="who ai"><b>참가자 A · B · C</b><span>각자 지갑(주소)이 있고, 0.02 SUI를 걸고 들어옵니다. 매일 공부한 내용을 글로 냅니다. 이번 데모에서는 A가 심판 지갑과 같습니다.</span></div>
+    <div class="who ai"><b>판정 에이전트 (agent.ts)</b><span>심판 프로그램. 제출 글을 모아 기억을 불러오고, AI에게 물어 판정한 뒤, 탈락자 명단을 체인에 보냅니다.</span></div>
+    <div class="who ai"><b>Claude (LLM)</b><span>실제로 글을 읽고 PASS/FAIL과 근거 한두 문장을 쓰는 AI. 에이전트가 매번 API로 부릅니다.</span></div>
+    <div class="who ai"><b>Walrus (기억 창고)</b><span>Sui 생태계의 파일 저장소. 에이전트의 기억(과거 제출·판정)을 매일 한 덩어리(blob)로 저장합니다. 누구나 열어 볼 수 있습니다.</span></div>
+    <div class="who chain"><b>Sui 컨트랙트 (challenge.move)</b><span>자동 금고이자 회계 장부. 예치금을 보관하고, 탈락자 명단을 받으면 정해진 공식대로 몰수·재분배를 계산합니다. 사람이 손댈 수 없습니다.</span></div>
+    <div class="who chain"><b>대시보드 (frontend)</b><span>체인의 상태를 5초마다 읽어 화면에 보여주는 웹페이지. 읽기만 하고 쓰지는 않습니다.</span></div>
+  </div>
+</section>
+
+<!-- 3. 큰 그림 -->
+<section>
+  <div class="eyebrow">3 · 큰 그림</div>
+  <h2>하루치 판정이 흘러가는 길</h2>
+  <div class="figure">
+    <svg viewBox="0 0 900 360" role="img" aria-label="참가자 제출부터 대시보드까지의 흐름">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g style="color:var(--muted)" stroke="currentColor" stroke-width="2" fill="none">
+        <!-- 참가자 → 에이전트 -->
+        <path d="M170,180 L230,180" marker-end="url(#arr)"/>
+        <!-- 에이전트 ↔ Walrus -->
+        <path d="M290,146 L290,96" marker-end="url(#arr)"/>
+        <path d="M330,96 L330,146" marker-end="url(#arr)"/>
+        <!-- 에이전트 ↔ Claude -->
+        <path d="M290,214 L290,264" marker-end="url(#arr)"/>
+        <path d="M330,264 L330,214" marker-end="url(#arr)"/>
+        <!-- 에이전트 → 컨트랙트 -->
+        <path d="M400,180 L540,180" marker-end="url(#arr)"/>
+        <!-- 컨트랙트 → 대시보드 -->
+        <path d="M710,180 L770,180" marker-end="url(#arr)"/>
+      </g>
+      <!-- 상자들 -->
+      <g font-family="IBM Plex Sans KR, sans-serif" font-size="13">
+        <!-- 참가자 -->
+        <rect x="20" y="146" width="150" height="68" rx="10" fill="var(--ai-bg)" stroke="var(--ai)" stroke-width="2"/>
+        <text x="95" y="172" text-anchor="middle" fill="var(--ink)" font-weight="700">① 참가자</text>
+        <text x="95" y="192" text-anchor="middle" fill="var(--ink)">오늘 공부한 내용을 글로</text>
+        <!-- 에이전트 -->
+        <rect x="230" y="146" width="170" height="68" rx="10" fill="var(--ai-bg)" stroke="var(--ai)" stroke-width="2"/>
+        <text x="315" y="172" text-anchor="middle" fill="var(--ink)" font-weight="700">② 판정 에이전트</text>
+        <text x="315" y="192" text-anchor="middle" fill="var(--ink)" font-family="IBM Plex Mono, monospace" font-size="12">agent.ts</text>
+        <!-- Walrus -->
+        <rect x="215" y="28" width="200" height="68" rx="10" fill="var(--ai-bg)" stroke="var(--ai)" stroke-width="2"/>
+        <text x="315" y="54" text-anchor="middle" fill="var(--ink)" font-weight="700">Walrus 기억 창고</text>
+        <text x="315" y="74" text-anchor="middle" fill="var(--ink)">과거 제출과 판정 기록</text>
+        <text x="270" y="126" text-anchor="end" fill="var(--muted)" font-size="11">어제까지 기억 읽기</text>
+        <text x="350" y="126" fill="var(--muted)" font-size="11">오늘 판정 저장</text>
+        <!-- Claude -->
+        <rect x="215" y="264" width="200" height="68" rx="10" fill="var(--ai-bg)" stroke="var(--ai)" stroke-width="2"/>
+        <text x="315" y="290" text-anchor="middle" fill="var(--ink)" font-weight="700">Claude (AI)</text>
+        <text x="315" y="310" text-anchor="middle" fill="var(--ink)">규칙 + 기억 + 오늘 글 → PASS/FAIL</text>
+        <text x="270" y="244" text-anchor="end" fill="var(--muted)" font-size="11">물어보기</text>
+        <text x="350" y="244" fill="var(--muted)" font-size="11">판정 + 근거</text>
+        <!-- 컨트랙트 -->
+        <rect x="540" y="146" width="170" height="68" rx="10" fill="var(--chain-bg)" stroke="var(--chain)" stroke-width="2"/>
+        <text x="625" y="172" text-anchor="middle" fill="var(--ink)" font-weight="700">③ Sui 컨트랙트</text>
+        <text x="625" y="192" text-anchor="middle" fill="var(--ink)">금고 · 탈락 기록 · 정산</text>
+        <text x="470" y="168" text-anchor="middle" fill="var(--muted)" font-size="11">탈락자 명단 전송</text>
+        <text x="470" y="200" text-anchor="middle" fill="var(--muted)" font-size="11" font-family="IBM Plex Mono, monospace">submit_results</text>
+        <!-- 대시보드 -->
+        <rect x="770" y="146" width="110" height="68" rx="10" fill="var(--chain-bg)" stroke="var(--chain)" stroke-width="2"/>
+        <text x="825" y="172" text-anchor="middle" fill="var(--ink)" font-weight="700">④ 대시보드</text>
+        <text x="825" y="192" text-anchor="middle" fill="var(--ink)">5초마다 읽기</text>
+      </g>
+    </svg>
+    <div class="caption">주황 상자는 해커톤 당일에 붙인 부분, 파란 상자는 여름에 만들어 둔 부분입니다. 컨트랙트는 다시 배포하지 않았고, 원래 비어 있던 "심판 자리"에 에이전트가 들어갔습니다.</div>
+  </div>
+
+  <h3>순서대로 읽으면</h3>
+  <ol>
+    <li><b>참가자가 글을 낸다.</b> 지금은 파일(<span class="mono">evidence/day3.json</span>)에 세 명의 글이 들어 있습니다. 나중엔 앱 입력창이 될 자리입니다.</li>
+    <li><b>에이전트가 Walrus에서 기억을 읽는다.</b> "어제까지 각자 뭘 냈고 어떤 판정을 받았나"가 들어 있습니다.</li>
+    <li><b>Claude에게 세 가지를 주고 묻는다.</b> 규칙, 그 사람의 과거 제출, 오늘 제출. 답은 <span class="mono">{"verdict":"FAIL","reason":"…"}</span> 형식으로만 받습니다.</li>
+    <li><b>탈락자 명단을 체인에 보낸다.</b> 심판 지갑으로 서명해서 <span class="mono">submit_results</span>를 호출합니다. 이게 "실제 트랜잭션"이고, 한 번 보내면 되돌릴 수 없습니다.</li>
+    <li><b>컨트랙트가 알아서 계산한다.</b> 탈락자의 몰수액을 정해 남은 날에 걸쳐 생존자에게 나눠 줍니다.</li>
+    <li><b>성공했을 때만 기억을 갱신한다.</b> 오늘 판정을 더한 기억을 Walrus에 새 덩어리로 저장하고, 그 주소(blobId)를 적어 둡니다.</li>
+    <li><b>대시보드는 그냥 보여 준다.</b> 체인을 읽기만 하므로 누가 열어도 같은 숫자가 나옵니다.</li>
+  </ol>
+</section>
+
+<!-- 4. 5일 타임라인 -->
+<section>
+  <div class="eyebrow">4 · 실제로 돌린 5일</div>
+  <h2>발표용 방에서 일어난 일</h2>
+  <p>A는 알고리즘, B는 운영체제, C는 확률을 공부했습니다. 3일째 C가, 4일째 B가 <b>"예전에 낸 걸 표현만 바꿔 재제출"</b>해서 탈락했습니다. 공부 내용 자체는 멀쩡했고, 떨어진 이유는 오직 중복입니다.</p>
+  <div class="days">
+    <div class="day"><b>Day 1</b><div class="p"><span>A</span><span class="tag pass">PASS</span></div><div class="p"><span>B</span><span class="tag pass">PASS</span></div><div class="p"><span>C</span><span class="tag pass">PASS</span></div><div class="caption">기억 0건으로 시작</div></div>
+    <div class="day"><b>Day 2</b><div class="p"><span>A</span><span class="tag pass">PASS</span></div><div class="p"><span>B</span><span class="tag pass">PASS</span></div><div class="p"><span>C</span><span class="tag pass">PASS</span></div><div class="caption">기억 3건 로드</div></div>
+    <div class="day"><b>Day 3</b><div class="p"><span>A</span><span class="tag pass">PASS</span></div><div class="p"><span>B</span><span class="tag pass">PASS</span></div><div class="p"><span>C</span><span class="tag fail">FAIL</span></div><div class="caption">C가 Day 1을 재서술</div></div>
+    <div class="day"><b>Day 4</b><div class="p"><span>A</span><span class="tag pass">PASS</span></div><div class="p"><span>B</span><span class="tag fail">FAIL</span></div><div class="p"><span>C</span><span style="color:var(--muted)">탈락</span></div><div class="caption">B가 Day 2를 재서술</div></div>
+    <div class="day"><b>Day 5</b><div class="p"><span>A</span><span class="tag pass">PASS</span></div><div class="p"><span>B</span><span style="color:var(--muted)">탈락</span></div><div class="p"><span>C</span><span style="color:var(--muted)">탈락</span></div><div class="caption">finalize → 정산 확정</div></div>
+  </div>
+  <div class="note"><p><b>기억이 판정을 바꿨다는 증거:</b> C의 Day 1 글과 Day 3 글은 사실상 같은 내용입니다. 기억이 비어 있던 Day 1에는 PASS, 기억 6건을 든 Day 3에는 FAIL. 같은 글, 다른 결과. 이 기록은 전부 Walrus에 공개로 남아 있어 누구나 확인할 수 있습니다.</p></div>
+</section>
+
+<!-- 5. 돈 -->
+<section>
+  <div class="eyebrow">5 · 돈은 어떻게 움직였나</div>
+  <h2>60,000,000 MIST가 세 사람에게 다시 나뉜 방법</h2>
+  <p>MIST는 SUI의 가장 작은 단위입니다 (1 SUI = 10억 MIST). 세 명이 20,000,000 MIST(0.02 SUI)씩 걸어 금고에 60,000,000이 모였습니다.</p>
+  <div class="figure">
+    <div class="money">
+      <div class="row"><span>A · 완주</span><div class="bar"><div class="seg" style="width:33.3%;background:var(--chain)"></div><div class="seg" style="width:41.7%;background:var(--pass)"></div></div><span class="num">45,040,000</span></div>
+      <div class="row"><span>B · Day 4</span><div class="bar"><div class="seg" style="width:13.6%;background:var(--chain)"></div><div class="seg" style="width:4.4%;background:var(--pass)"></div></div><span class="num">10,800,000</span></div>
+      <div class="row"><span>C · Day 3</span><div class="bar"><div class="seg" style="width:6.9%;background:var(--chain)"></div></div><span class="num">4,160,000</span></div>
+      <div class="row"><span><b>합계</b></span><div></div><span class="num"><b>60,000,000</b></span></div>
+    </div>
+    <div class="legend"><span><i class="sw" style="background:var(--chain)"></i>자기 돈에서 돌려받은 몫 (환급)</span><span><i class="sw" style="background:var(--pass)"></i>남의 몰수액에서 받은 몫 (배당)</span></div>
+    <div class="caption">막대 길이는 60,000,000을 100%로 잡은 비율입니다. 합계가 정확히 금고 잔액과 같아서 "dust 0" — 1 MIST도 사라지지 않았습니다.</div>
+  </div>
+
+  <h3>왜 늦게 떨어질수록 더 받나</h3>
+  <p>환급 비율은 <span class="mono">R(k) = 0.2·(k/D) + 0.8·(k/D)²</span> 입니다. k는 버틴 날수, D는 총 일수(5). 뒤로 갈수록 하루의 가치가 커지는 볼록한 곡선이라, 5일짜리 방에서는 마지막 하루가 첫날의 4.6배 값어치입니다.</p>
+  <div class="tablewrap"><table>
+    <tr><th>사람</th><th>버틴 날 k</th><th>환급 비율</th><th>환급액</th><th>몰수액</th></tr>
+    <tr><td>C (Day 3 탈락)</td><td>2</td><td>0.208</td><td class="mono">4,160,000</td><td class="mono">15,840,000</td></tr>
+    <tr><td>B (Day 4 탈락)</td><td>3</td><td>0.408</td><td class="mono">8,160,000</td><td class="mono">11,840,000</td></tr>
+    <tr><td>A (완주)</td><td>5</td><td>원금 전액</td><td class="mono">20,000,000</td><td class="mono">0</td></tr>
+  </table></div>
+  <p style="margin-top:12px">몰수액은 한꺼번에 주지 않고 <b>남은 날에 걸쳐 조금씩(스트리밍)</b> 생존자에게 흘려 보냅니다. C의 15,840,000은 Day 3·4·5 세 날에 5,280,000씩 나뉘어 A와 B가 지분대로 받았고, B가 떨어진 뒤로는 A 혼자 받았습니다. 그래서 B는 8,160,000 + 배당 2,640,000 = 10,800,000이 됩니다.</p>
+</section>
+
+<!-- 6. 안전장치 -->
+<section>
+  <div class="eyebrow">6 · 왜 이렇게 조심스러운가</div>
+  <h2>체인에 보낸 건 되돌릴 수 없다</h2>
+  <p><span class="mono">submit_results</span>는 한 번 성공하면 날짜가 하루 넘어가고, 그 날의 탈락은 영구히 기록됩니다. 그래서 에이전트는 조금이라도 이상하면 보내지 않고 멈춥니다.</p>
+  <div class="tablewrap"><table>
+    <tr><th>멈추는 경우</th><th>왜</th></tr>
+    <tr><td>AI 답이 정해진 JSON 형식이 아닐 때</td><td>형식 오류를 FAIL로 처리하면 무고한 탈락이 생김. 에러로 중단</td></tr>
+    <tr><td>내가 말한 day와 체인의 다음 day가 다를 때</td><td>엉뚱한 날 제출 방지</td></tr>
+    <tr><td>살아 있는 참가자의 글이 빠졌을 때</td><td>파일 실수 하나로 탈락시키지 않기 위해</td></tr>
+    <tr><td>전원이 FAIL일 때</td><td>"전멸"이 되어 방이 즉시 종료됨. 명시적 허용 없이는 안 보냄</td></tr>
+    <tr><td>서명 지갑이 심판 지갑이 아닐 때</td><td>권한 없는 지갑으로는 컨트랙트가 거부</td></tr>
+    <tr><td>미리 본 판정과 실제 판정이 다를 때</td><td>AI는 매번 답이 조금씩 달라질 수 있어, 예상 명단(<span class="mono">--expect-fail</span>)과 다르면 중단</td></tr>
+  </table></div>
+  <p style="margin-top:12px">그리고 실제 전송 전에 항상 <b>dry-run</b>(모의 실행)을 먼저 돌립니다. 모의 실행은 아무것도 바꾸지 않아 몇 번을 해도 안전합니다.</p>
+</section>
+
+<!-- 7. 파일 지도 -->
+<section>
+  <div class="eyebrow">7 · 저장소 지도</div>
+  <h2>폴더를 열면 무엇이 있나</h2>
+  <div class="tree">
+    <div><span class="d">summer-2026/</span></div>
+    <div>├─ BLOCKTHON.md <span class="c">— 해커톤 채점표와 "무엇을 만들지" 판단 기준</span></div>
+    <div>├─ BLOCKTHON_STATUS.md <span class="c">— 당일 진행 상황, 방 ID, 트랜잭션 기록 (오늘의 정본)</span></div>
+    <div>├─ deck.html <span class="c">— 발표 슬라이드 8장. 브라우저로 열고 ←→로 넘김</span></div>
+    <div>├─ CLAUDE.md <span class="c">— AI 도구가 읽는 팀 공통 규칙</span></div>
+    <div>├─ <span class="d">contracts/godsaeng/</span> <span class="c">— ③ Sui 컨트랙트 (Move 언어). 배포됐으니 수정 금지</span></div>
+    <div>│  └─ sources/challenge.move <span class="c">— 금고·환급 공식·정산 로직 전부</span></div>
+    <div>├─ <span class="d">scripts/</span> <span class="c">— ② 심판 쪽 프로그램들</span></div>
+    <div>│  ├─ agent.ts <span class="c">— 판정 에이전트 (오늘의 핵심)</span></div>
+    <div>│  ├─ replay.ts <span class="c">— Walrus 기억을 읽어 판정 로그를 다시 보여 줌</span></div>
+    <div>│  ├─ read_state.ts <span class="c">— 체인 상태 읽기 (공용 부품)</span></div>
+    <div>│  ├─ evidence/day1~5.json <span class="c">— 참가자들이 낸 글 (입력)</span></div>
+    <div>│  ├─ demo-logs/ <span class="c">— 인터넷이 끊겨도 보여 줄 판정 로그 저장본</span></div>
+    <div>│  ├─ .env <span class="c">— 비밀값(API 키)과 방 ID. 깃에 올라가지 않음</span></div>
+    <div>│  └─ .walrus-memory <span class="c">— 최신 기억 덩어리의 주소 한 줄. 깃에 올라가지 않음</span></div>
+    <div>├─ <span class="d">frontend/</span> <span class="c">— ④ 대시보드 (React). 주소 뒤에 ?challenge=방ID 를 붙여 봄</span></div>
+    <div>└─ <span class="d">docs/</span></div>
+    <div>   ├─ DECISIONS.md <span class="c">— 설계 결정 30건과 이유 (설계의 정본)</span></div>
+    <div>   └─ DEPLOYMENT.md <span class="c">— 배포된 패키지·방 목록 (배포 정보의 정본)</span></div>
+  </div>
+  <div class="caption">"정본"은 여러 문서가 다르게 말할 때 이기는 문서입니다. 설계는 DECISIONS.md, 배포 정보는 DEPLOYMENT.md, 오늘 상황은 BLOCKTHON_STATUS.md.</div>
+</section>
+
+<!-- 8. 용어 -->
+<section>
+  <div class="eyebrow">8 · 용어 사전</div>
+  <h2>발표와 문서에 나오는 말들</h2>
+  <dl>
+    <dt>온체인</dt><dd>블록체인 위에 기록된 것. 누구나 볼 수 있고 아무도 몰래 고칠 수 없습니다.</dd>
+    <dt>트랜잭션</dt><dd>체인에 보내는 한 번의 요청. "참여", "탈락자 제출", "정산 확정"이 각각 하나씩입니다.</dd>
+    <dt>다이제스트</dt><dd>트랜잭션의 고유 번호(영수증 번호). 이걸로 탐색기에서 찾아볼 수 있습니다.</dd>
+    <dt>컨트랙트</dt><dd>체인 위에서 돌아가는 프로그램. 여기서는 금고 겸 회계사입니다.</dd>
+    <dt>방 (Challenge)</dt><dd>내기 한 판. 방마다 참가자·금고·날짜가 따로 있고, 고유 ID가 있습니다.</dd>
+    <dt>오라클</dt><dd>컨트랙트에 "누가 탈락했다"를 알려 줄 권한을 가진 지갑. 방을 만든 사람이 됩니다. 이 프로젝트의 심판입니다.</dd>
+    <dt>Walrus / blob / blobId</dt><dd>Sui 생태계의 파일 저장소 / 저장된 파일 한 덩어리 / 그 덩어리의 주소. 에이전트의 기억이 여기 있습니다.</dd>
+    <dt>SUI / MIST / gas</dt><dd>코인 / 그 최소 단위(10억분의 1) / 트랜잭션을 보낼 때 내는 수수료.</dd>
+    <dt>testnet</dt><dd>연습용 체인. 돈은 가짜(faucet에서 무료로 받음)지만 동작은 진짜와 같습니다.</dd>
+    <dt>vault / dust</dt><dd>방의 금고 잔액 / 계산 오차로 떠도는 잔돈. 이 프로젝트는 dust 0입니다.</dd>
+    <dt>PENDING → ACTIVE → ENDED</dt><dd>방의 상태. 모집 중(철회 가능) → 진행 중(돈 잠김) → 종료(정산 확정).</dd>
+    <dt>finalize / claim</dt><dd>5일이 끝난 뒤 각자 받을 금액을 확정하는 호출 / 그 금액을 실제로 지갑으로 가져가는 호출.</dd>
+    <dt>dry-run</dt><dd>모의 실행. 결과를 미리 보되 체인에는 아무것도 쓰지 않습니다.</dd>
+    <dt>PTB (sui client ptb)</dt><dd>Sui 명령줄 도구로 트랜잭션을 만들어 서명·전송하는 명령. 개인키를 파일에 두지 않으려고 이걸 씁니다.</dd>
+    <dt>LLM</dt><dd>글을 읽고 쓰는 AI 모델. 여기서는 Claude이며, 심판의 "두뇌" 역할입니다.</dd>
+  </dl>
+</section>
+
+<!-- 9. 아직 안 된 것 -->
+<section>
+  <div class="eyebrow">9 · 솔직한 한계</div>
+  <h2>질문이 나오면 이렇게 답한다</h2>
+  <ul>
+    <li><b>지갑 앱이 없다.</b> 참여·판정·정산은 모두 진짜 트랜잭션이지만, 참가자가 누르는 화면은 아직 없습니다. 지금은 파일로 대신합니다.</li>
+    <li><b>Walrus에 올린 글은 공개다.</b> 제출 원문이 누구에게나 보입니다. 다음 단계는 Seal(암호화)로 원문은 가리고 판정 근거만 공개하는 것.</li>
+    <li><b>심판 지갑이 참가자 A와 같다.</b> 데모라서 지갑을 하나로 썼습니다. 실서비스에서는 반드시 분리합니다.</li>
+    <li><b>글은 위조가 쉽다.</b> 컨트랙트는 "누가 탈락했나"만 받으므로, 증빙 방식(사진·기기 데이터 등)은 나중에 갈아 끼울 수 있습니다.</li>
+    <li><b>AI 판정은 매번 조금 다를 수 있다.</b> 그래서 미리 보기(dry-run)와 예상 명단 대조를 거친 뒤에만 보냅니다.</li>
+  </ul>
+</section>
+
+</main>
