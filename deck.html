@@ -57,6 +57,12 @@
   }
   .disclaimer { position: absolute; right: 7vw; bottom: 9vh; font-size: clamp(11px, 1vw, 15px); color: var(--muted); font-style: italic; }
 
+  /* 1.5 what */
+  ol.what { margin: 0; padding-left: 1.6em; display: grid; gap: 1.6vh; }
+  ol.what li { font-size: clamp(22px, 2.8vw, 46px); font-weight: 700; line-height: 1.25; }
+  ol.what li::marker { color: var(--today); font-weight: 800; }
+  .what-foot { margin: 6vh 0 0; font-size: clamp(20px, 2.4vw, 40px); color: var(--today); font-weight: 800; }
+
   /* 2. problem */
   .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 3vw; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 3vh 2.2vw; }
@@ -186,6 +192,19 @@
     <span class="chip">체인이 정산한다</span>
   </div>
   <div class="disclaimer">not financial advice. not life advice either.</div>
+</section>
+
+<!-- 1.5 이게 뭔가 -->
+<section class="slide" data-title="what">
+  <p class="kicker">한 장 요약</p>
+  <h2>이게 뭔가</h2>
+  <ol class="what">
+    <li>방에 들어가 돈을 건다</li>
+    <li>매일 인증, 못 하면 탈락</li>
+    <li>늦게 탈락할수록 더 돌려받는다</li>
+    <li>탈락자 몫은 생존자에게</li>
+  </ol>
+  <p class="what-foot">남이 포기할수록 내가 번다.</p>
 </section>
 
 <!-- 2. 문제 -->
